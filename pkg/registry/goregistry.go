@@ -22,11 +22,11 @@ type (
 		// Start initiates the actor's message processing loop.
 		// The provided context is used for cancellation and should be monitored
 		// throughout the actor's lifetime.
-		Start(context.Context)
+		Start(context.Context) error
 
 		// Stop gracefully shuts down the actor within the specified timeout.
 		// If the actor cannot stop within the timeout, it may be forcefully terminated.
-		Stop(timeout time.Duration)
+		Stop(timeout time.Duration) error
 
 		// WaitReady blocks until the actor is ready to process messages.
 		// It returns an error if the actor is not ready within the specified timeout.

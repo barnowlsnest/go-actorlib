@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"time"
 )
@@ -185,7 +186,10 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 func (ga *GoActor[T]) Start(ctx context.Context) error {
 	entity := ga.provider.Provide()
 
-	if any(entity) == nil {
+	// Check if entity is nil using reflection
+	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
+	rv := reflect.ValueOf(entity)
+	if !rv.IsValid() || (rv.Kind() == reflect.Ptr && rv.IsNil()) {
 		return ErrActorNilEntity
 	}
 

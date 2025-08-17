@@ -29,7 +29,8 @@ tasks:
   go:test:
     desc: Run all tests
     cmds:
-      - go test '{{.ALL_GO_FILES}}'
+      - go test -cover '{{.ALL_GO_FILES}}'
+      - go test -bench=. '{{.ALL_GO_FILES}}'
 
   check:
     desc: Run all checks (fmt, build, test, vet)
