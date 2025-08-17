@@ -539,7 +539,7 @@ func BenchmarkGoCommand_Execute_WithError(b *testing.B) {
 func BenchmarkGoCommand_ConcurrentStateAccess(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	delegateFn := func(entity *TestEntity) (string, error) {
-		time.Sleep(time.Duration(b.N) * time.Millisecond) // Simulate work
+		time.Sleep(10 * time.Millisecond) // Simulate work
 		return entity.GetValue(), nil
 	}
 	cmd := New(delegateFn)
