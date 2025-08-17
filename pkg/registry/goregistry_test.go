@@ -474,7 +474,6 @@ func (suite *GoRegistryTestSuite) TestStartAll_WithSomeFailures_ShouldReturnColl
 	actor1 := NewMockActor("success-actor", uint64(actor.Initialized))
 	actor2 := NewMockActor("fail-actor", uint64(actor.Initialized))
 	actor2.SetWaitError(errors.New("wait failed"))
-	// actor3 := NewMockActor("stopped-actor", uint64(actor.Done)) // Removed as actors in Done state cannot be registered
 
 	_, err := suite.registry.Register("success-actor", actor1)
 	require.NoError(suite.T(), err)
