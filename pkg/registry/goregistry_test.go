@@ -485,7 +485,6 @@ func (suite *GoRegistryTestSuite) TestStartAll_WithSomeFailures_ShouldReturnColl
 	// Don't register the stopped actor as it should fail
 	// _, err = suite.registry.Register("stopped-actor", actor3)
 	// require.NoError(suite.T(), err)
-
 	// Act
 	err = suite.registry.StartAll(suite.ctx)
 
