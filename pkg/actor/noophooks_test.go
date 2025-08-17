@@ -35,11 +35,11 @@ func TestNoopHooks_BeforeStart_ShouldNotPanic(t *testing.T) {
 	assert.NotPanics(t, func() {
 		hooks.BeforeStart("test entity")
 	})
-	
+
 	assert.NotPanics(t, func() {
 		hooks.BeforeStart(nil)
 	})
-	
+
 	assert.NotPanics(t, func() {
 		hooks.BeforeStart(123)
 	})
@@ -53,11 +53,11 @@ func TestNoopHooks_BeforeStop_ShouldNotPanic(t *testing.T) {
 	assert.NotPanics(t, func() {
 		hooks.BeforeStop("test entity")
 	})
-	
+
 	assert.NotPanics(t, func() {
 		hooks.BeforeStop(nil)
 	})
-	
+
 	assert.NotPanics(t, func() {
 		hooks.BeforeStop(struct{ value int }{42})
 	})
@@ -71,7 +71,7 @@ func TestNoopHooks_OnError_ShouldNotPanic(t *testing.T) {
 	assert.NotPanics(t, func() {
 		hooks.OnError(errors.New("test error"))
 	})
-	
+
 	assert.NotPanics(t, func() {
 		hooks.OnError(nil)
 	})

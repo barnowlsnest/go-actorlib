@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/google/uuid"
 
 	"github.com/barnowlsnest/go-actor-lib/pkg/actor"
 )
@@ -41,11 +41,11 @@ func NewMockActor(name string, initialState uint64) *MockActor {
 func (ma *MockActor) Start(ctx context.Context) error {
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
-	
+
 	if ma.startError != nil {
 		return ma.startError
 	}
-	
+
 	ma.started = true
 	atomic.StoreUint64(&ma.state, uint64(actor.Started))
 	return nil
@@ -54,11 +54,11 @@ func (ma *MockActor) Start(ctx context.Context) error {
 func (ma *MockActor) Stop(timeout time.Duration) error {
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
-	
+
 	if ma.stopError != nil {
 		return ma.stopError
 	}
-	
+
 	ma.stopped = true
 	atomic.StoreUint64(&ma.state, uint64(actor.Done))
 	return nil
@@ -67,15 +67,15 @@ func (ma *MockActor) Stop(timeout time.Duration) error {
 func (ma *MockActor) WaitReady(ctx context.Context, timeout time.Duration) error {
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
-	
+
 	if ma.waitError != nil {
 		return ma.waitError
 	}
-	
+
 	if !ma.started {
 		return context.DeadlineExceeded
 	}
-	
+
 	return nil
 }
 
@@ -86,7 +86,7 @@ func (ma *MockActor) State() uint64 {
 func (ma *MockActor) Receive(ctx context.Context, executable actor.Executable[actor.Entity]) error {
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
-	
+
 	ma.commands = append(ma.commands, executable)
 	return nil
 }
@@ -187,11 +187,13 @@ type NotActionableActor struct {
 	name string
 }
 
-func (naa *NotActionableActor) Start(ctx context.Context) error     { return nil }
-func (naa *NotActionableActor) Stop(timeout time.Duration) error    { return nil }
-func (naa *NotActionableActor) WaitReady(ctx context.Context, timeout time.Duration) error { return nil }
-func (naa *NotActionableActor) State() uint64                      { return uint64(actor.Initialized) }
-func (naa *NotActionableActor) Name() string                       { return naa.name }
+func (naa *NotActionableActor) Start(ctx context.Context) error  { return nil }
+func (naa *NotActionableActor) Stop(timeout time.Duration) error { return nil }
+func (naa *NotActionableActor) WaitReady(ctx context.Context, timeout time.Duration) error {
+	return nil
+}
+func (naa *NotActionableActor) State() uint64 { return uint64(actor.Initialized) }
+func (naa *NotActionableActor) Name() string  { return naa.name }
 
 // GoRegistryTestSuite provides a test suite for GoRegistry
 type GoRegistryTestSuite struct {
@@ -351,10 +353,10 @@ func (suite *GoRegistryTestSuite) TestGetAll_WithMultipleActors_ShouldReturnAllM
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", actor.Started)
-	
+
 	id1, err := suite.registry.Register("actor1", actor1)
 	require.NoError(suite.T(), err)
-	
+
 	id2, err := suite.registry.Register("actor2", actor2)
 	require.NoError(suite.T(), err)
 
@@ -363,7 +365,7 @@ func (suite *GoRegistryTestSuite) TestGetAll_WithMultipleActors_ShouldReturnAllM
 
 	// Assert
 	assert.Len(suite.T(), models, 2)
-	
+
 	// Find models by ID
 	var model1, model2 *Model
 	for i := range models {
@@ -373,13 +375,13 @@ func (suite *GoRegistryTestSuite) TestGetAll_WithMultipleActors_ShouldReturnAllM
 			model2 = &models[i]
 		}
 	}
-	
+
 	require.NotNil(suite.T(), model1)
 	require.NotNil(suite.T(), model2)
-	
+
 	assert.Equal(suite.T(), "actor1", model1.Name)
 	assert.Equal(suite.T(), uint64(actor.Initialized), model1.State)
-	
+
 	assert.Equal(suite.T(), "actor2", model2.Name)
 	assert.Equal(suite.T(), uint64(actor.Started), model2.State)
 }
@@ -451,10 +453,10 @@ func (suite *GoRegistryTestSuite) TestStartAll_WithMultipleActors_ShouldStartAll
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", uint64(actor.Initialized))
-	
+
 	_, err := suite.registry.Register("actor1", actor1)
 	require.NoError(suite.T(), err)
-	
+
 	_, err = suite.registry.Register("actor2", actor2)
 	require.NoError(suite.T(), err)
 
@@ -473,13 +475,13 @@ func (suite *GoRegistryTestSuite) TestStartAll_WithSomeFailures_ShouldReturnColl
 	actor2 := NewMockActor("fail-actor", uint64(actor.Initialized))
 	actor2.SetWaitError(errors.New("wait failed"))
 	// actor3 := NewMockActor("stopped-actor", uint64(actor.Done)) // Removed as actors in Done state cannot be registered
-	
+
 	_, err := suite.registry.Register("success-actor", actor1)
 	require.NoError(suite.T(), err)
-	
+
 	_, err = suite.registry.Register("fail-actor", actor2)
 	require.NoError(suite.T(), err)
-	
+
 	// Don't register the stopped actor as it should fail
 	// _, err = suite.registry.Register("stopped-actor", actor3)
 	// require.NoError(suite.T(), err)
@@ -500,7 +502,7 @@ func (suite *GoRegistryTestSuite) TestStop_WithStartedActor_ShouldStopSuccessful
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
 	_, err := suite.registry.Register("test-actor", mockActor)
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.Start(suite.ctx, "test-actor")
 	require.NoError(suite.T(), err)
 
@@ -540,13 +542,13 @@ func (suite *GoRegistryTestSuite) TestStopAll_WithMultipleStartedActors_ShouldSt
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", uint64(actor.Initialized))
-	
+
 	_, err := suite.registry.Register("actor1", actor1)
 	require.NoError(suite.T(), err)
-	
+
 	_, err = suite.registry.Register("actor2", actor2)
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.StartAll(suite.ctx)
 	require.NoError(suite.T(), err)
 
@@ -563,13 +565,13 @@ func (suite *GoRegistryTestSuite) TestStopAll_WithMixedStates_ShouldStopOnlyStar
 	// Arrange
 	actor1 := NewMockActor("started-actor", uint64(actor.Initialized))
 	actor2 := NewMockActor("not-started-actor", uint64(actor.Initialized))
-	
+
 	_, err := suite.registry.Register("started-actor", actor1)
 	require.NoError(suite.T(), err)
-	
+
 	_, err = suite.registry.Register("not-started-actor", actor2)
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.Start(suite.ctx, "started-actor")
 	require.NoError(suite.T(), err)
 
@@ -588,10 +590,10 @@ func (suite *GoRegistryTestSuite) TestUnregister_WithStoppedActor_ShouldRemoveAc
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
 	_, err := suite.registry.Register("test-actor", mockActor)
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.Start(suite.ctx, "test-actor")
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.Stop("test-actor")
 	require.NoError(suite.T(), err)
 
@@ -600,7 +602,7 @@ func (suite *GoRegistryTestSuite) TestUnregister_WithStoppedActor_ShouldRemoveAc
 
 	// Assert
 	require.NoError(suite.T(), err)
-	
+
 	// Verify actor is removed
 	_, err = suite.registry.Get("test-actor")
 	assert.Error(suite.T(), err)
@@ -621,7 +623,7 @@ func (suite *GoRegistryTestSuite) TestUnregister_WithRunningActor_ShouldReturnEr
 	mockActor := NewMockActor("running-actor", uint64(actor.Initialized))
 	_, err := suite.registry.Register("running-actor", mockActor)
 	require.NoError(suite.T(), err)
-	
+
 	err = suite.registry.Start(suite.ctx, "running-actor")
 	require.NoError(suite.T(), err)
 
@@ -639,7 +641,7 @@ func (suite *GoRegistryTestSuite) TestDispatch_WithValidActor_ShouldDispatchComm
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
 	id, err := suite.registry.Register("test-actor", mockActor)
 	require.NoError(suite.T(), err)
-	
+
 	command := NewMockCommand("test-command")
 
 	// Act
@@ -674,25 +676,25 @@ func (suite *GoRegistryTestSuite) TestConcurrentOperations_ShouldBeSafe() {
 	// Act - Perform concurrent registrations, starts, stops, and lookups
 	for i := 0; i < numOperations; i++ {
 		wg.Add(4)
-		
+
 		go func(index int) {
 			defer wg.Done()
 			mockActor := NewMockActor(fmt.Sprintf("actor-%d", index), uint64(actor.Initialized))
 			suite.registry.Register(fmt.Sprintf("actor-%d", index), mockActor)
 		}(i)
-		
+
 		go func(index int) {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond) // Give registration time
 			suite.registry.Start(suite.ctx, fmt.Sprintf("actor-%d", index))
 		}(i)
-		
+
 		go func(index int) {
 			defer wg.Done()
 			time.Sleep(20 * time.Millisecond) // Give start time
 			suite.registry.Stop(fmt.Sprintf("actor-%d", index))
 		}(i)
-		
+
 		go func(index int) {
 			defer wg.Done()
 			suite.registry.Get(fmt.Sprintf("actor-%d", index))
@@ -742,7 +744,7 @@ func (suite *GoRegistryTestSuite) TestMustBeRunnable_WithUnknownState_ShouldRetu
 // Benchmark tests
 func BenchmarkGoRegistry_Register(b *testing.B) {
 	registry := New("bench-registry")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
@@ -752,13 +754,13 @@ func BenchmarkGoRegistry_Register(b *testing.B) {
 
 func BenchmarkGoRegistry_Get(b *testing.B) {
 	registry := New("bench-registry")
-	
+
 	// Setup actors
 	for i := 0; i < 1000; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
 		registry.Register(fmt.Sprintf("actor-%d", i), mockActor)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		registry.Get(fmt.Sprintf("actor-%d", i%1000))
@@ -767,13 +769,13 @@ func BenchmarkGoRegistry_Get(b *testing.B) {
 
 func BenchmarkGoRegistry_ConcurrentAccess(b *testing.B) {
 	registry := New("bench-registry")
-	
+
 	// Setup some actors
 	for i := 0; i < 100; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
 		registry.Register(fmt.Sprintf("actor-%d", i), mockActor)
 	}
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

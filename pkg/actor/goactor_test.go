@@ -16,10 +16,10 @@ import (
 
 // TestEntity is a mock entity for testing purposes
 type TestEntity struct {
-	value    string
-	isReady  bool
-	callLog  []string
-	mu       sync.Mutex
+	value   string
+	isReady bool
+	callLog []string
+	mu      sync.Mutex
 }
 
 func NewTestEntity(value string, isReady bool) *TestEntity {
@@ -80,10 +80,10 @@ func (tep *TestEntityProvider) Provide() *TestEntity {
 
 // TestCommand implements Executable for testing
 type TestCommand struct {
-	name       string
+	name        string
 	executeFunc func(ctx context.Context, entity *TestEntity)
-	executed   bool
-	mu         sync.Mutex
+	executed    bool
+	mu          sync.Mutex
 }
 
 func NewTestCommand(name string, executeFunc func(ctx context.Context, entity *TestEntity)) *TestCommand {
@@ -114,9 +114,9 @@ func (tc *TestCommand) Name() string {
 
 // TestHooks implements Hooks interface for testing
 type TestHooks struct {
-	calls   []string
-	errors  []error
-	mu      sync.Mutex
+	calls  []string
+	errors []error
+	mu     sync.Mutex
 }
 
 func NewTestHooks() *TestHooks {
@@ -297,13 +297,13 @@ func (suite *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully
 
 	// Assert
 	require.NoError(suite.T(), err)
-	
+
 	// Wait for actor to be ready
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
-	
+
 	assert.Equal(suite.T(), uint64(Started), actor.State())
-	
+
 	// Check hooks were called
 	calls := suite.hooks.GetCalls()
 	assert.Contains(suite.T(), calls, "BeforeStart:*actor.TestEntity")
@@ -346,10 +346,10 @@ func (suite *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 		WithHooks[*TestEntity](suite.hooks),
 	)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -359,7 +359,7 @@ func (suite *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 	// Assert
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), uint64(Done), actor.State())
-	
+
 	// Check hooks were called
 	calls := suite.hooks.GetCalls()
 	assert.Contains(suite.T(), calls, "BeforeStop:*actor.TestEntity")
@@ -395,7 +395,7 @@ func (suite *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately(
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
 
@@ -413,7 +413,7 @@ func (suite *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnCo
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	suite.cancel() // Cancel context
 
 	// Act
@@ -429,10 +429,10 @@ func (suite *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccess
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -444,7 +444,7 @@ func (suite *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccess
 
 	// Act
 	err = actor.Receive(suite.ctx, command)
-	
+
 	// Give some time for command to execute
 	time.Sleep(10 * time.Millisecond)
 
@@ -452,7 +452,7 @@ func (suite *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccess
 	require.NoError(suite.T(), err)
 	assert.True(suite.T(), executed)
 	assert.True(suite.T(), command.IsExecuted())
-	
+
 	callLog := suite.entity.GetCallLog()
 	assert.Contains(suite.T(), callLog, "SetValue:updated-by-command")
 }
@@ -461,7 +461,7 @@ func (suite *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
 
@@ -477,13 +477,13 @@ func (suite *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Stop(100 * time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -505,10 +505,10 @@ func (suite *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 		WithReceiveTimeout[*TestEntity](0), // No timeout
 	)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -531,10 +531,10 @@ func (suite *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 		WithHooks[*TestEntity](suite.hooks),
 	)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -545,16 +545,16 @@ func (suite *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 	// Act
 	err = actor.Receive(suite.ctx, panicCommand)
 	require.NoError(suite.T(), err)
-	
+
 	// Give time for panic to be handled
 	time.Sleep(20 * time.Millisecond)
 
 	// Assert
 	assert.Equal(suite.T(), uint64(Panicked), actor.State())
-	
+
 	hookErrors := suite.hooks.GetErrors()
 	assert.NotEmpty(suite.T(), hookErrors)
-	
+
 	foundPanicError := false
 	for _, hookErr := range hookErrors {
 		if errors.Is(hookErr, ErrActorPanic) {
@@ -579,7 +579,7 @@ func (suite *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	// Arrange
 	baseHooks := NewTestHooks()
 	panicHooks := &PanicHooks{TestHooks: baseHooks}
-	
+
 	actor, err := New(
 		WithProvider[*TestEntity](suite.provider),
 		WithHooks[*TestEntity](panicHooks),
@@ -591,10 +591,10 @@ func (suite *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 
 	// Assert
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
-	
+
 	// Actor should still be running despite hook panic
 	// But it may have transitioned to Panicked state due to the panic
 	state := actor.State()
@@ -609,25 +609,25 @@ func (suite *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracef
 		WithHooks[*TestEntity](suite.hooks),
 	)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
 	// Act
 	suite.cancel()
-	
+
 	// Give time for context cancellation to be processed
 	time.Sleep(20 * time.Millisecond)
 
 	// Assert
 	assert.Equal(suite.T(), uint64(Cancelled), actor.State())
-	
+
 	hookErrors := suite.hooks.GetErrors()
 	assert.NotEmpty(suite.T(), hookErrors)
-	
+
 	foundContextError := false
 	for _, hookErr := range hookErrors {
 		if errors.Is(hookErr, ErrActorContextCanceled) {
@@ -650,16 +650,16 @@ func (suite *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence(
 	// Act & Assert - Start
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
-	
+
 	assert.Equal(suite.T(), uint64(Started), actor.State())
 
 	// Act & Assert - Stop
 	err = actor.Stop(100 * time.Millisecond)
 	require.NoError(suite.T(), err)
-	
+
 	assert.Equal(suite.T(), uint64(Done), actor.State())
 }
 
@@ -692,10 +692,10 @@ func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](suite.provider))
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.Start(suite.ctx)
 	require.NoError(suite.T(), err)
-	
+
 	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
 	require.NoError(suite.T(), err)
 
@@ -711,10 +711,10 @@ func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 				atomic.AddInt64(&executionCount, 1)
 				time.Sleep(time.Millisecond) // Simulate work
 			})
-			
+
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			
+
 			actor.Receive(ctx, command)
 		}(i)
 	}
@@ -751,13 +751,13 @@ func BenchmarkGoActor_CreateAndStart(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		ctx := context.Background()
 		err = actor.Start(ctx)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		actor.WaitReady(ctx, time.Second)
 		actor.Stop(time.Second)
 	}
@@ -766,18 +766,18 @@ func BenchmarkGoActor_CreateAndStart(b *testing.B) {
 func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
-	
+
 	actor, err := New(WithProvider[*TestEntity](provider))
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	ctx := context.Background()
 	err = actor.Start(ctx)
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	err = actor.WaitReady(ctx, time.Second)
 	if err != nil {
 		b.Fatal(err)
@@ -788,31 +788,31 @@ func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
 		command := NewTestCommand("bench-cmd", func(ctx context.Context, entity *TestEntity) {
 			entity.GetValue()
 		})
-		
+
 		err := actor.Receive(ctx, command)
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
-	
+
 	actor.Stop(time.Second)
 }
 
 func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
-	
+
 	actor, err := New(WithProvider[*TestEntity](provider))
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	ctx := context.Background()
 	err = actor.Start(ctx)
 	if err != nil {
 		b.Fatal(err)
 	}
-	
+
 	err = actor.WaitReady(ctx, time.Second)
 	if err != nil {
 		b.Fatal(err)
@@ -824,6 +824,6 @@ func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
 			actor.State()
 		}
 	})
-	
+
 	actor.Stop(time.Second)
 }
