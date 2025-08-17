@@ -1,0 +1,62 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  ALL_GO_FILES: ./...
+
+tasks:
+  go:mod:tidy:
+    desc: Update all dependencies
+    cmds:
+      - go mod tidy
+
+  go:build:
+    desc: Build all packages
+    cmds:
+      - go build '{{.ALL_GO_FILES}}'
+
+  go:fmt:
+    desc: Format all Go files
+    cmds:
+      - go fmt '{{.ALL_GO_FILES}}'
+
+  go:vet:
+    desc: Run static analysis
+    cmds:
+      - go vet '{{.ALL_GO_FILES}}'
+
+  go:test:
+    desc: Run all tests
+    cmds:
+      - go test '{{.ALL_GO_FILES}}'
+
+  check:
+    desc: Run all checks (fmt, build, test, vet)
+    deps:
+      - go:mod:tidy
+      - go:fmt
+      - go:build
+      - go:vet
+      - go:test
+
+  release:major:
+    desc: Create a major release
+    deps:
+      - check
+    cmds:
+      - ./scripts/release.sh major
+
+  release:minor:
+    desc: Create a minor release
+    deps:
+      - check
+    cmds:
+      - ./scripts/release.sh minor
+
+  release:patch:
+    desc: Create a patch release
+    deps:
+      - check
+    cmds:
+      - ./scripts/release.sh patch
