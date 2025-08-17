@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
+	
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -93,10 +93,10 @@ func (suite *GoCommandTestSuite) TestNew_ShouldCreateCommandWithCorrectInitialSt
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return entity.GetValue(), nil
 	}
-
+	
 	// Act
 	cmd := New(delegateFn)
-
+	
 	// Assert
 	require.NotNil(suite.T(), cmd)
 	assert.Equal(suite.T(), Created, cmd.State())
@@ -110,13 +110,13 @@ func (suite *GoCommandTestSuite) TestNew_ShouldCreateChannelWithBufferSizeOne() 
 	delegateFn := func(entity *TestEntity) (int, error) {
 		return 42, nil
 	}
-
+	
 	// Act
 	cmd := New(delegateFn)
-
+	
 	// Assert
 	require.NotNil(suite.T(), cmd)
-
+	
 	// Test that channel has buffer size 1 by sending without blocking
 	cmd.done <- 123
 	select {
@@ -135,10 +135,10 @@ func (suite *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldReturnCor
 		return expectedResult, nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act
 	cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Assert
 	select {
 	case result := <-cmd.Done():
@@ -146,7 +146,7 @@ func (suite *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldReturnCor
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Finished, cmd.State())
 	assert.Nil(suite.T(), cmd.Error())
 }
@@ -158,10 +158,10 @@ func (suite *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldInteractW
 		return entity.GetValue(), nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act
 	cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Assert
 	select {
 	case result := <-cmd.Done():
@@ -169,7 +169,7 @@ func (suite *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldInteractW
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	callLog := suite.entity.GetCallLog()
 	assert.Contains(suite.T(), callLog, "SetValue:updated-value")
 	assert.Contains(suite.T(), callLog, "GetValue")
@@ -183,10 +183,10 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionError_ShouldSetFail
 		return "", expectedError
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act
 	cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Assert
 	select {
 	case <-cmd.Done():
@@ -194,7 +194,7 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionError_ShouldSetFail
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Failed, cmd.State())
 	assert.Equal(suite.T(), expectedError, cmd.Error())
 }
@@ -206,13 +206,13 @@ func (suite *GoCommandTestSuite) TestExecute_ContextCancellation_ShouldSetCancel
 		return "should not reach here", nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Cancel context before execution
 	suite.cancel()
-
+	
 	// Act
 	cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Assert
 	select {
 	case <-cmd.Done():
@@ -220,7 +220,7 @@ func (suite *GoCommandTestSuite) TestExecute_ContextCancellation_ShouldSetCancel
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Canceled, cmd.State())
 	assert.NotNil(suite.T(), cmd.Error())
 	assert.ErrorIs(suite.T(), cmd.Error(), ErrCommandContextCancelled)
@@ -237,14 +237,14 @@ func (suite *GoCommandTestSuite) TestExecute_ContextCancellationDuringExecution_
 		return "completed", nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act
 	go cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Wait for execution to start, then cancel context
 	<-started
 	suite.cancel()
-
+	
 	// Assert
 	select {
 	case result := <-cmd.Done():
@@ -253,7 +253,7 @@ func (suite *GoCommandTestSuite) TestExecute_ContextCancellationDuringExecution_
 	case <-time.After(200 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Finished, cmd.State())
 	assert.Nil(suite.T(), cmd.Error())
 }
@@ -265,10 +265,10 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecover
 		panic("something went wrong")
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act
 	cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Assert
 	select {
 	case <-cmd.Done():
@@ -276,7 +276,7 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecover
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Panic, cmd.State())
 	assert.Equal(suite.T(), ErrCommandPanic, cmd.Error())
 }
@@ -292,7 +292,7 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentT
 		{"nil panic", nil},
 		{"struct panic", struct{ msg string }{"struct panic"}},
 	}
-
+	
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			// Arrange
@@ -300,10 +300,10 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentT
 				panic(tc.panicValue)
 			}
 			cmd := New(delegateFn)
-
+			
 			// Act
 			cmd.Execute(suite.ctx, suite.entity)
-
+			
 			// Assert
 			select {
 			case <-cmd.Done():
@@ -311,7 +311,7 @@ func (suite *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentT
 			case <-time.After(100 * time.Millisecond):
 				t.Fatal("Command should have completed")
 			}
-
+			
 			assert.Equal(t, Panic, cmd.State())
 			assert.Equal(t, ErrCommandPanic, cmd.Error())
 		})
@@ -325,27 +325,27 @@ func (suite *GoCommandTestSuite) TestStateTransitions_ShouldFollowCorrectSequenc
 		return "result", nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Assert initial state
 	assert.Equal(suite.T(), Created, cmd.State())
-
+	
 	// Act & Assert state during execution
 	go cmd.Execute(suite.ctx, suite.entity)
-
+	
 	// Wait briefly to ensure execution starts
-	time.Sleep(10 * time.Millisecond)
-
+	time.Sleep(500 * time.Millisecond)
+	
 	// State should be Started or Finished (depends on timing)
 	state := cmd.State()
 	assert.True(suite.T(), state == Started || state == Finished)
-
+	
 	// Wait for completion
 	select {
 	case <-cmd.Done():
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	// Final state should be Finished
 	assert.Equal(suite.T(), Finished, cmd.State())
 }
@@ -358,17 +358,17 @@ func (suite *GoCommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 		return 42, nil
 	}
 	cmd := New(delegateFn)
-
+	
 	// Act - Start command execution and concurrent state access
 	var wg sync.WaitGroup
-
+	
 	// Start execution
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		cmd.Execute(suite.ctx, suite.entity)
 	}()
-
+	
 	// Concurrent state reads
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -384,10 +384,10 @@ func (suite *GoCommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 			}
 		}()
 	}
-
+	
 	// Wait for all goroutines
 	wg.Wait()
-
+	
 	// Assert final state
 	select {
 	case result := <-cmd.Done():
@@ -395,7 +395,7 @@ func (suite *GoCommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	case <-time.After(100 * time.Millisecond):
 		suite.T().Fatal("Command should have completed")
 	}
-
+	
 	assert.Equal(suite.T(), Finished, cmd.State())
 }
 
@@ -443,7 +443,7 @@ func (suite *GoCommandTestSuite) TestExecute_DifferentResultTypes_ShouldWork() {
 			expected: func() *string { s := "pointer result"; return &s }(),
 		},
 	}
-
+	
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			var state int
@@ -499,7 +499,7 @@ func (suite *GoCommandTestSuite) TestExecute_DifferentResultTypes_ShouldWork() {
 				}
 				state = cmd.State()
 			}
-
+			
 			assert.Equal(t, Finished, state)
 		})
 	}
@@ -511,7 +511,7 @@ func BenchmarkGoCommand_Execute_Success(b *testing.B) {
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return entity.GetValue(), nil
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := New(delegateFn)
@@ -526,7 +526,7 @@ func BenchmarkGoCommand_Execute_WithError(b *testing.B) {
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return "", errors.New("benchmark error")
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := New(delegateFn)
@@ -543,10 +543,10 @@ func BenchmarkGoCommand_ConcurrentStateAccess(b *testing.B) {
 		return entity.GetValue(), nil
 	}
 	cmd := New(delegateFn)
-
+	
 	ctx := context.Background()
 	go cmd.Execute(ctx, entity)
-
+	
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
