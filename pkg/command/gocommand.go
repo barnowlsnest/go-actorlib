@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync"
-
-	"github.com/barnowlsnest/go-actor-lib/pkg/actor"
+	
+	"github.com/barnowlsnest/go-actorlib/pkg/actor"
 )
 
 // Command execution states define the lifecycle stages of command processing.
@@ -15,23 +15,23 @@ const (
 	// Created indicates the command has been created but not yet started.
 	// This is the initial state for all commands.
 	Created = iota
-
+	
 	// Started indicates the command is currently executing.
 	// The command has been dequeued and is being processed.
 	Started
-
+	
 	// Finished indicates the command completed successfully.
 	// Any result data has been made available through the command's Result channel.
 	Finished
-
+	
 	// Failed indicates the command failed during execution.
 	// Error information is available through the command's error reporting methods.
 	Failed
-
+	
 	// Canceled indicates the command was canceled before completion.
 	// This typically occurs when the execution context is canceled.
 	Canceled
-
+	
 	// Panic indicates the command panicked during execution.
 	// The panic has been recovered and converted to an error state.
 	Panic
@@ -44,7 +44,7 @@ type (
 	// executed on entities. It provides type safety and error handling for
 	// command implementations.
 	DelegateFn[T actor.Entity, R any] func(entity T) (R, error)
-
+	
 	GoCommand[E actor.Entity, R any] struct {
 		mu         sync.Mutex
 		state      int
@@ -88,7 +88,7 @@ func (gc *GoCommand[E, R]) State() int {
 
 func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 	gc.syncState(Started, nil)
-
+	
 	select {
 	case <-ctx.Done():
 		gc.syncState(Canceled, errors.Join(ErrCommandContextCancelled, ctx.Err()))
@@ -102,15 +102,15 @@ func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 					close(gc.done)
 				}
 			}()
-
+			
 			val, err := gc.delegateFn(entity)
-
+			
 			if err != nil {
 				gc.syncState(Failed, err)
 				close(gc.done)
 				return
 			}
-
+			
 			gc.done <- val
 			gc.syncState(Finished, nil)
 			close(gc.done)

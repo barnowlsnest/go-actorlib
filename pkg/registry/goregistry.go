@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/barnowlsnest/go-actor-lib/pkg/actor"
+	
+	"github.com/barnowlsnest/go-actorlib/pkg/actor"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
@@ -23,19 +23,19 @@ type (
 		// The provided context is used for cancellation and should be monitored
 		// throughout the actor's lifetime.
 		Start(context.Context) error
-
+		
 		// Stop gracefully shuts down the actor within the specified timeout.
 		// If the actor cannot stop within the timeout, it may be forcefully terminated.
 		Stop(timeout time.Duration) error
-
+		
 		// WaitReady blocks until the actor is ready to process messages.
 		// It returns an error if the actor is not ready within the specified timeout.
 		WaitReady(ctx context.Context, timeout time.Duration) error
-
+		
 		// State returns the current state of the actor.
 		State() uint64
 	}
-
+	
 	// Actionable defines the interface for actors that can receive and process commands.
 	//
 	// This generic interface provides type-safe command queuing, ensuring that
@@ -46,9 +46,9 @@ type (
 		// actor stopped, or invalid command).
 		Receive(context.Context, actor.Executable[TEntity]) error
 	}
-
+	
 	GoRegistryOption func(*GoRegistry) *GoRegistry
-
+	
 	GoRegistry struct {
 		tag          string
 		startTimeout time.Duration
@@ -57,13 +57,13 @@ type (
 		actors       map[uuid.UUID]*runnableModelEntry
 		lookupTable  map[string]uuid.UUID
 	}
-
+	
 	Model struct {
 		ID    uuid.UUID
 		State uint64
 		Name  string
 	}
-
+	
 	runnableModelEntry struct {
 		name  string
 		actor Runnable
@@ -92,11 +92,11 @@ func New(tag string, opts ...GoRegistryOption) *GoRegistry {
 		actors:       make(map[uuid.UUID]*runnableModelEntry),
 		lookupTable:  make(map[string]uuid.UUID),
 	}
-
+	
 	for _, opt := range opts {
 		container = opt(container)
 	}
-
+	
 	return container
 }
 
@@ -104,12 +104,12 @@ func mustBeRunnable(a any) (Runnable, error) {
 	if a == nil {
 		return nil, ErrNilActor
 	}
-
+	
 	runnableActor, ok := a.(Runnable)
 	if !ok {
 		return nil, ErrActorIsNotRunnable
 	}
-
+	
 	switch runnableActor.State() {
 	case actor.Initialized, actor.Started:
 		return runnableActor, nil
@@ -124,12 +124,12 @@ func mustBeActionable(a any) (Actionable[actor.Entity], error) {
 	if a == nil {
 		return nil, ErrNilActor
 	}
-
+	
 	actionable, ok := a.(Actionable[actor.Entity])
 	if !ok {
 		return nil, ErrActorIsNotActionable
 	}
-
+	
 	return actionable, nil
 }
 
@@ -142,49 +142,49 @@ func (gr *GoRegistry) Register(name string, a any) (uuid.UUID, error) {
 	if runnableErr != nil {
 		return uuid.Nil, runnableErr
 	}
-
+	
 	_, actionableErr := mustBeActionable(a)
 	if actionableErr != nil {
 		return uuid.Nil, actionableErr
 	}
-
+	
 	gr.mu.Lock()
 	id := uuid.New()
 	gr.actors[id] = &runnableModelEntry{name, runnableActor}
 	gr.lookupTable[name] = id
 	gr.mu.Unlock()
-
+	
 	return id, nil
 }
 
 func (gr *GoRegistry) Get(name string) (*Model, error) {
 	gr.mu.Lock()
 	defer gr.mu.Unlock()
-
+	
 	id, exists := gr.lookupTable[name]
 	if !exists {
 		return nil, ErrActorNotFound
 	}
-
+	
 	var ptr *Model
 	entry, exists := gr.actors[id]
 	if !exists {
 		return nil, ErrActorNotFound
 	}
-
+	
 	ptr = &Model{
 		ID:    id,
 		Name:  entry.name,
 		State: entry.actor.State(),
 	}
-
+	
 	return ptr, nil
 }
 
 func (gr *GoRegistry) GetAll() []Model {
 	gr.mu.Lock()
 	defer gr.mu.Unlock()
-
+	
 	stateSlice := make([]Model, 0, len(gr.actors))
 	for id, model := range gr.actors {
 		stateSlice = append(stateSlice, Model{
@@ -193,7 +193,7 @@ func (gr *GoRegistry) GetAll() []Model {
 			State: model.actor.State(),
 		})
 	}
-
+	
 	return stateSlice
 }
 
@@ -204,12 +204,12 @@ func (gr *GoRegistry) getRunnable(name string) (Runnable, error) {
 	if !exists {
 		return nil, ErrActorNotFound
 	}
-
+	
 	model, exists := gr.actors[id]
 	if !exists || model == nil || model.actor == nil {
 		return nil, ErrNilActor
 	}
-
+	
 	var runnableActor Runnable
 	switch model.actor.State() {
 	case actor.Initialized:
@@ -221,7 +221,7 @@ func (gr *GoRegistry) getRunnable(name string) (Runnable, error) {
 	default: // Unknown state
 		return nil, ErrUnknownActorState
 	}
-
+	
 	return runnableActor, nil
 }
 
@@ -230,12 +230,12 @@ func (gr *GoRegistry) getStoppable(name string) (Runnable, error) {
 	if !exists {
 		return nil, ErrActorNotFound
 	}
-
+	
 	model, exists := gr.actors[id]
 	if !exists || model == nil || model.actor == nil {
 		return nil, ErrNilActor
 	}
-
+	
 	var stoppableActor Runnable
 	switch model.actor.State() {
 	case actor.Initialized:
@@ -247,7 +247,7 @@ func (gr *GoRegistry) getStoppable(name string) (Runnable, error) {
 	default: // Unknown state
 		return nil, ErrUnknownActorState
 	}
-
+	
 	return stoppableActor, nil
 }
 
@@ -259,12 +259,12 @@ func (gr *GoRegistry) Start(ctx context.Context, name string) error {
 		return errors.Join(fmt.Errorf("failed to start actor: '%s'", name), err)
 	}
 	gr.mu.Unlock()
-
+	
 	runnableActor.Start(ctx)
 	if errReady := runnableActor.WaitReady(ctx, gr.startTimeout); errReady != nil {
 		return errors.Join(ErrActorIsNotRunnable, errReady)
 	}
-
+	
 	return nil
 }
 
@@ -283,7 +283,7 @@ func (gr *GoRegistry) StartAll(ctx context.Context) error {
 		runnableActors = append(runnableActors, runnableActor)
 	}
 	gr.mu.Unlock()
-
+	
 	// Start all runnable actors and wait until they are ready without holding the lock.
 	errGroup, groupCtx := errgroup.WithContext(ctx)
 	for _, ra := range runnableActors {
@@ -293,15 +293,15 @@ func (gr *GoRegistry) StartAll(ctx context.Context) error {
 			return runnableActor.WaitReady(groupCtx, gr.startTimeout)
 		})
 	}
-
+	
 	if errWait := errGroup.Wait(); errWait != nil {
 		joinErr = append(joinErr, fmt.Errorf("some actors failed to start: '%s'", errWait.Error()))
 	}
-
+	
 	if len(joinErr) > 0 {
 		return errors.Join(joinErr...)
 	}
-
+	
 	return nil
 }
 
@@ -316,7 +316,7 @@ func (gr *GoRegistry) Stop(name string) error {
 	}
 	gr.mu.Unlock()
 	stoppableActor.Stop(gr.stopTimeout)
-
+	
 	return nil
 }
 
@@ -339,7 +339,7 @@ func (gr *GoRegistry) StopAll() error {
 		stoppableActors = append(stoppableActors, stoppableActor)
 	}
 	gr.mu.Unlock()
-
+	
 	// Stop all stoppable actors concurrently and wait for completion.
 	var wg sync.WaitGroup
 	for _, sa := range stoppableActors {
@@ -351,7 +351,7 @@ func (gr *GoRegistry) StopAll() error {
 		}()
 	}
 	wg.Wait()
-
+	
 	if len(joinErr) > 0 {
 		return errors.Join(joinErr...)
 	}
@@ -364,12 +364,12 @@ func (gr *GoRegistry) StopAll() error {
 func (gr *GoRegistry) Unregister(name string) error {
 	gr.mu.Lock()
 	defer gr.mu.Unlock()
-
+	
 	id, exists := gr.lookupTable[name]
 	if !exists {
 		return ErrActorNotFound
 	}
-
+	
 	entry, ok := gr.actors[id]
 	// Stale entry: actor missing or nil
 	if !ok || entry == nil || entry.actor == nil {
@@ -377,7 +377,7 @@ func (gr *GoRegistry) Unregister(name string) error {
 		delete(gr.actors, id)
 		return nil
 	}
-
+	
 	switch entry.actor.State() {
 	case actor.Done, actor.StoppedWithError, actor.Cancelled, actor.Panicked:
 		delete(gr.lookupTable, name)
@@ -402,6 +402,6 @@ func (gr *GoRegistry) Dispatch(ctx context.Context, id uuid.UUID, e actor.Execut
 	if err != nil {
 		return errors.Join(fmt.Errorf("failed to dispatch executable to actor: '%s'", id.String()), err)
 	}
-
+	
 	return actionableActor.Receive(ctx, e)
 }
