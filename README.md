@@ -1,1 +1,1 @@
-# go-actor-lib
+# go-actorlib
