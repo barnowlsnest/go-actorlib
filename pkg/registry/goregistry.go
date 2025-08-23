@@ -260,7 +260,10 @@ func (gr *GoRegistry) Start(ctx context.Context, name string) error {
 	}
 	gr.mu.Unlock()
 	
-	runnableActor.Start(ctx)
+	if err = runnableActor.Start(ctx); err != nil {
+		return err
+	}
+	
 	if errReady := runnableActor.WaitReady(ctx, gr.startTimeout); errReady != nil {
 		return errors.Join(ErrActorIsNotRunnable, errReady)
 	}
@@ -287,7 +290,10 @@ func (gr *GoRegistry) StartAll(ctx context.Context) error {
 	// Start all runnable actors and wait until they are ready without holding the lock.
 	errGroup, groupCtx := errgroup.WithContext(ctx)
 	for _, ra := range runnableActors {
-		ra.Start(ctx)
+		if err := ra.Start(ctx); err != nil {
+			return err
+		}
+		
 		runnableActor := ra // capture per-iteration variable to avoid closure capture issue
 		errGroup.Go(func() error {
 			return runnableActor.WaitReady(groupCtx, gr.startTimeout)
@@ -315,7 +321,9 @@ func (gr *GoRegistry) Stop(name string) error {
 		return errors.Join(fmt.Errorf("failed to stop actor: '%s'", name), err)
 	}
 	gr.mu.Unlock()
-	stoppableActor.Stop(gr.stopTimeout)
+	if err = stoppableActor.Stop(gr.stopTimeout); err != nil {
+		return err
+	}
 	
 	return nil
 }
@@ -347,7 +355,7 @@ func (gr *GoRegistry) StopAll() error {
 		stoppableActor := sa // capture
 		go func() {
 			defer wg.Done()
-			stoppableActor.Stop(gr.stopTimeout)
+			_ = stoppableActor.Stop(gr.stopTimeout)
 		}()
 	}
 	wg.Wait()
