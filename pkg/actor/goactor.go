@@ -31,7 +31,7 @@ type (
 		// the entity is in a valid state.
 		IsProvidable() bool
 	}
-
+	
 	// Executable defines the interface for commands that actors can execute.
 	//
 	// This generic interface ensures type safety by binding commands to specific
@@ -41,7 +41,7 @@ type (
 		// The context can be used for cancellation and timeout control.
 		Execute(context.Context, T)
 	}
-
+	
 	Hooks interface {
 		AfterStart()
 		AfterStop()
@@ -49,24 +49,24 @@ type (
 		BeforeStop(entity any)
 		OnError(err error)
 	}
-
+	
 	EntityProvider[T Entity] interface {
 		Provide() T
 	}
-
+	
 	GoActor[T Entity] struct {
 		receiveTimeout time.Duration
 		inputBufSize   uint64
 		state          uint64
-
+		
 		input chan Executable[T]
 		done  chan struct{}
 		ready chan struct{}
-
+		
 		hooks    Hooks
 		provider EntityProvider[T]
 	}
-
+	
 	GoActorOption[T Entity] func(*GoActor[T]) *GoActor[T]
 )
 
@@ -75,24 +75,24 @@ func New[T Entity](opts ...GoActorOption[T]) (*GoActor[T], error) {
 		inputBufSize:   1,               // default input buffer size
 		receiveTimeout: 5 * time.Second, // default receive timeout
 	}
-
+	
 	for _, opt := range opts {
 		actor = opt(actor)
 	}
-
+	
 	if actor.provider == nil {
 		return nil, ErrActorNilProvider
 	}
-
+	
 	if actor.hooks == nil {
 		actor.hooks = &noopHooks{}
 	}
-
+	
 	actor.input = make(chan Executable[T], actor.inputBufSize)
 	actor.done = make(chan struct{})
 	actor.ready = make(chan struct{})
 	actor.state = Initialized
-
+	
 	return actor, nil
 }
 
@@ -114,7 +114,7 @@ func (ga *GoActor[T]) InputBufferSize() int {
 func (ga *GoActor[T]) WaitReady(ctx context.Context, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-
+	
 	select {
 	case <-ga.ready:
 		return nil
@@ -151,7 +151,7 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 	if err == nil {
 		return
 	}
-
+	
 	switch {
 	case errors.Is(err, context.Canceled):
 		atomic.StoreUint64(&ga.state, Cancelled)
@@ -169,50 +169,50 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	if e == nil {
 		return ErrActorReceiveNil
 	}
-
+	
 	if atomic.LoadUint64(&ga.state) > 1 {
 		return ErrActorReceiveOnStopped
 	}
-
+	
 	t := ga.receiveTimeout
-
+	
 	if t == 0 {
 		return ga.processExecutable(ctx, e)
 	}
-
+	
 	return ga.processExecutableWithTimeout(ctx, e, t)
 }
 
 func (ga *GoActor[T]) Start(ctx context.Context) error {
 	entity := ga.provider.Provide()
-
+	
 	// Check if entity is nil using reflection
 	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
 	rv := reflect.ValueOf(entity)
 	if !rv.IsValid() || (rv.Kind() == reflect.Ptr && rv.IsNil()) {
 		return ErrActorNilEntity
 	}
-
+	
 	if !entity.IsProvidable() {
 		return ErrActorNilEntity
 	}
-
+	
 	func(e T) {
 		defer ga.catchPanic()
 		ga.hooks.BeforeStart(e)
 	}(entity)
-
+	
 	go func(ctx context.Context, entity T) {
 		defer close(ga.done)
-
+		
 		atomic.StoreUint64(&ga.state, Started)
 		close(ga.ready) // Signal that the actor is ready to receive messages
-
+		
 		func() {
 			defer ga.catchPanic()
 			ga.hooks.AfterStart()
 		}()
-
+		
 		for {
 			select {
 			case <-ctx.Done():
@@ -224,10 +224,10 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 						defer ga.catchPanic()
 						ga.hooks.BeforeStop(e)
 					}(entity)
-
+					
 					return
 				}
-
+				
 				select {
 				case <-ctx.Done():
 					ga.handleCtxErr(ctx.Err())
@@ -248,13 +248,13 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 	if err := ga.CheckState(Started); err != nil {
 		return err
 	}
-
+	
 	close(ga.input)
 	atomic.StoreUint64(&ga.state, Stopping)
-
+	
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-
+	
 	select {
 	case <-ga.done:
 		atomic.StoreUint64(&ga.state, Done)
@@ -262,12 +262,12 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 		atomic.StoreUint64(&ga.state, StoppedWithError)
 		ga.hooks.OnError(ErrActorGracefulStopTimeout)
 	}
-
+	
 	func() {
 		defer ga.catchPanic()
 		ga.hooks.AfterStop()
 	}()
-
+	
 	return nil
 }
 
