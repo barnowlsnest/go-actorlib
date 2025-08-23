@@ -290,8 +290,8 @@ func (gr *GoRegistry) StartAll(ctx context.Context) error {
 	// Start all runnable actors and wait until they are ready without holding the lock.
 	errGroup, groupCtx := errgroup.WithContext(ctx)
 	for _, ra := range runnableActors {
-		if err := ra.Start(ctx); err != nil {
-			return err
+			joinErr = append(joinErr, errors.Join(fmt.Errorf("failed to start actor: '%s'", gr.getName(ra)), err))
+			continue
 		}
 		
 		runnableActor := ra // capture per-iteration variable to avoid closure capture issue
