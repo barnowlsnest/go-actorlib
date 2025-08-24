@@ -27,8 +27,9 @@
 //		return entity.value, nil
 //	})
 //
-//	// Send to actor (assuming actor is already started)
-//	err := actor.Receive(ctx, cmd)
+//	// Send to actor (assuming myActor is already started)
+//	var myActor *actor.Actor // assume this is your actor instance
+//	err := myActor.Receive(ctx, cmd)
 //	if err != nil {
 //		panic(err)
 //	}
