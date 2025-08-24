@@ -1,0 +1,140 @@
+@startuml component-relationships
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Component Relationships and Interfaces
+
+package "Type System" {
+  interface Entity {
+    +IsProvidable() bool
+  }
+  
+  interface "Executable<T>" as Executable {
+    +Execute(context.Context, T)
+  }
+  
+  interface "EntityProvider<T>" as EntityProvider {
+    +Provide() T
+  }
+  
+  interface Hooks {
+    +BeforeStart(entity any)
+    +AfterStart()
+    +BeforeStop(entity any) 
+    +AfterStop()
+    +OnError(err error)
+  }
+}
+
+package "Actor System" {
+  class "GoActor<T>" as GoActor {
+    -receiveTimeout time.Duration
+    -inputBufSize uint64
+    -state uint64
+    -input chan Executable<T>
+    -done chan struct{}
+    -ready chan struct{}
+    -hooks Hooks
+    -provider EntityProvider<T>
+    --
+    +New(...GoActorOption<T>) (*GoActor<T>, error)
+    +Start(context.Context) error
+    +Stop(time.Duration) error
+    +Receive(context.Context, Executable<T>) error
+    +WaitReady(context.Context, time.Duration) error
+    +State() uint64
+  }
+  
+  class "GoActorOption<T>" as GoActorOption {
+    +WithProvider(EntityProvider<T>)
+    +WithInputBufferSize(uint64) 
+    +WithReceiveTimeout(time.Duration)
+    +WithHooks(Hooks)
+  }
+}
+
+package "Command System" {
+  class "GoCommand<E,R>" as GoCommand {
+    -mu sync.Mutex
+    -state int
+    -done chan R
+    -err error
+    -delegateFn DelegateFn<E,R>
+    --
+    +New(DelegateFn<E,R>) *GoCommand<E,R>
+    +Execute(context.Context, E)
+    +Done() <-chan R
+    +Error() error
+    +State() int
+  }
+  
+  class "DelegateFn<T,R>" as DelegateFn {
+    func(entity T) (R, error)
+  }
+}
+
+package "Registry System" {
+  interface Runnable {
+    +Start(context.Context) error
+    +Stop(time.Duration) error
+    +WaitReady(context.Context, time.Duration) error
+    +State() uint64
+  }
+  
+  interface "Actionable<T>" as Actionable {
+    +Receive(context.Context, Executable<T>) error
+  }
+  
+  class GoRegistry {
+    -tag string
+    -startTimeout time.Duration
+    -stopTimeout time.Duration
+    -mu sync.Mutex
+    -actors map[UUID]*runnableModelEntry
+    -lookupTable map[string]UUID
+    --
+    +New(string, ...GoRegistryOption) *GoRegistry
+    +Register(string, any) (UUID, error)
+    +Start(context.Context, string) error
+    +StartAll(context.Context) error
+    +Stop(string) error
+    +StopAll() error
+    +Get(string) (*Model, error)
+    +GetAll() []Model
+    +Dispatch(context.Context, UUID, Executable) error
+  }
+  
+  class Model {
+    +ID UUID
+    +State uint64
+    +Name string
+  }
+}
+
+' Inheritance relationships
+GoActor ..|> Runnable
+GoActor ..|> Actionable
+GoCommand ..|> Executable
+
+' Composition relationships
+GoActor *-- EntityProvider
+GoActor *-- Hooks
+GoActor o-- Executable : processes
+GoCommand *-- DelegateFn
+GoRegistry *-- Model
+GoRegistry o-- Runnable : manages
+GoRegistry o-- Actionable : dispatches to
+
+' Dependencies
+EntityProvider ..> Entity : provides
+DelegateFn ..> Entity : operates on
+Executable ..> Entity : processes
+GoActorOption ..> GoActor : configures
+
+note bottom of GoActor : "Generic actor processing\nExecutable<T> commands on\nentities provided by EntityProvider<T>"
+
+note bottom of GoCommand : "Type-safe command wrapping\nDelegateFn<E,R> for async\nexecution with results"
+
+note bottom of GoRegistry : "Centralized management of\nRunnable actors with coordinated\nlifecycle operations"
+
+@enduml

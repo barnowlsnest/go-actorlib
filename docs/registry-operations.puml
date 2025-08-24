@@ -1,0 +1,75 @@
+@startuml registry-operations
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Registry Operations Flow
+
+participant "Client" as client
+participant "GoRegistry" as registry
+participant "GoActor A" as actorA
+participant "GoActor B" as actorB
+participant "GoActor C" as actorC
+
+== Registration Phase ==
+client -> registry : Register("actor-a", actorA)
+registry --> client : UUID-A
+
+client -> registry : Register("actor-b", actorB)
+registry --> client : UUID-B
+
+client -> registry : Register("actor-c", actorC)
+registry --> client : UUID-C
+
+== Concurrent Startup ==
+client -> registry : StartAll(ctx)
+activate registry
+
+par Start Actor A
+  registry -> actorA : Start(ctx)
+  activate actorA
+  registry -> actorA : WaitReady(ctx, timeout)
+  actorA --> registry : ready
+and Start Actor B
+  registry -> actorB : Start(ctx)
+  activate actorB
+  registry -> actorB : WaitReady(ctx, timeout)
+  actorB --> registry : ready
+and Start Actor C
+  registry -> actorC : Start(ctx)
+  activate actorC
+  registry -> actorC : WaitReady(ctx, timeout)
+  actorC --> registry : ready
+end
+
+registry --> client : success/aggregated errors
+deactivate registry
+
+== Message Dispatching ==
+client -> registry : Dispatch(ctx, UUID-A, command)
+registry -> actorA : Receive(ctx, command)
+actorA --> client : async result
+
+== Concurrent Shutdown ==
+client -> registry : StopAll()
+activate registry
+
+par Stop Actor A
+  registry -> actorA : Stop(timeout)
+  actorA --> registry : stopped
+  deactivate actorA
+and Stop Actor B  
+  registry -> actorB : Stop(timeout)
+  actorB --> registry : stopped
+  deactivate actorB
+and Stop Actor C
+  registry -> actorC : Stop(timeout)
+  actorC --> registry : stopped
+  deactivate actorC
+end
+
+registry --> client : success/aggregated errors
+deactivate registry
+
+note over registry : Registry provides coordinated\nlifecycle management with\nconcurrent operations
+
+@enduml
