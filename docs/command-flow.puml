@@ -1,0 +1,54 @@
+@startuml command-flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Command Execution Flow
+
+participant "Client" as client
+participant "GoCommand<E,R>" as cmd
+participant "GoActor<E>" as actor
+participant "Entity" as entity
+participant "Result Channel" as channel
+
+client -> cmd : New(delegateFn)
+activate cmd
+note right : State: Created
+
+client -> actor : Receive(ctx, cmd)
+activate actor
+
+actor -> cmd : Execute(ctx, entity)
+note right of cmd : State: Started
+
+alt Context not cancelled
+  cmd -> entity : delegateFn(entity)
+  activate entity
+  
+  alt Success
+    entity --> cmd : result, nil
+    deactivate entity
+    cmd -> channel : result
+    note right of cmd : State: Finished
+  else Error
+    entity --> cmd : zero, error
+    deactivate entity
+    note right of cmd : State: Failed
+  end
+  
+else Context cancelled
+  note right of cmd : State: Canceled
+end
+
+cmd -> cmd : close(channel)
+deactivate cmd
+deactivate actor
+
+client -> channel : <-Done()
+channel --> client : result (or closed)
+
+client -> cmd : Error()
+cmd --> client : error (if any)
+
+note over client, channel : Command provides type-safe\nasynchronous execution with results
+
+@enduml

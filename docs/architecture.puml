@@ -1,0 +1,65 @@
+@startuml go-actorlib-architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+title go-actorlib Architecture Overview
+
+package "Client Application" as client {
+  component [User Code] as user
+}
+
+package "pkg/registry" as registry_pkg {
+  component [GoRegistry] as registry
+  component [Model] as model
+  interface "Runnable" as runnable
+  interface "Actionable" as actionable
+}
+
+package "pkg/actor" as actor_pkg {
+  component [GoActor<T>] as actor
+  component [EntityProvider<T>] as provider
+  component [Hooks] as hooks
+  interface "Entity" as entity
+  interface "Executable<T>" as executable
+}
+
+package "pkg/command" as command_pkg {
+  component [GoCommand<E,R>] as command
+  component [DelegateFn<E,R>] as delegate
+}
+
+' Client relationships
+user --> registry : manages actors
+user --> actor : direct usage
+user --> command : creates commands
+
+' Registry relationships
+registry --> actor : manages lifecycle
+registry --> model : provides metadata
+registry ..> runnable : implements
+registry ..> actionable : implements
+actor ..|> runnable : implements
+actor ..|> actionable : implements
+
+' Actor relationships
+actor --> provider : gets entity
+actor --> hooks : lifecycle events
+actor --> executable : processes
+provider --> entity : provides
+command ..|> executable : implements
+
+' Command relationships
+command --> delegate : executes function
+delegate --> entity : operates on
+
+' Data flow annotations
+note right of registry : "Centralized actor\nlifecycle management"
+note right of actor : "Asynchronous message\nprocessing with entities"
+note right of command : "Type-safe operations\nwith return values"
+
+' State flow
+note top of actor : "States: Initialized → Started → Stopping → Done/Error"
+
+@enduml

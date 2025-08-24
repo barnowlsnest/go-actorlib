@@ -1,0 +1,38 @@
+@startuml actor-lifecycle
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Actor Lifecycle State Machine
+
+state "Initialized" as init : Actor created but not started
+state "Started" as started : Processing messages
+state "Stopping" as stopping : Graceful shutdown in progress
+state "Done" as done : Successfully stopped
+state "StoppedWithError" as error : Stopped due to error
+state "Cancelled" as cancelled : Context cancelled
+state "Panicked" as panicked : Recovered from panic
+
+[*] --> init : actor.New()
+
+init --> started : Start()
+init --> error : Start() fails
+
+started --> stopping : Stop() called
+started --> cancelled : Context cancelled
+started --> panicked : Panic recovered
+started --> error : Error during execution
+
+stopping --> done : Graceful shutdown complete
+stopping --> error : Shutdown timeout
+stopping --> cancelled : Context cancelled during stop
+
+done --> [*]
+error --> [*]
+cancelled --> [*]
+panicked --> [*]
+
+note right of started : "Hooks: BeforeStart, AfterStart\nProcessing Executable commands"
+note right of stopping : "Hooks: BeforeStop, AfterStop\nNo new messages accepted"
+note bottom of error : "Terminal state\nHooks: OnError"
+
+@enduml
