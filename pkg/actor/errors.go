@@ -28,8 +28,8 @@ var (
 	// This occurs when the actor's input buffer is full and the timeout expires.
 	ErrActorReceiveTimeout = errors.New("actor receive timeout")
 
-	// ErrActorContextCanceled is returned when the actor's context is cancelled.
-	// This typically happens during a graceful shutdown or when the parent context is cancelled.
+	// ErrActorContextCanceled is returned when the actor's context is canceled.
+	// This typically happens during a graceful shutdown or when the parent context is canceled.
 	ErrActorContextCanceled = errors.New("actor context err")
 
 	// ErrActorContextDeadlineExceeded is returned when the actor's context deadline is exceeded.
@@ -41,6 +41,6 @@ var (
 	ErrActorReceiveNil = errors.New("actor receive nil command")
 
 	// ErrActorReceiveOnStopped is returned when attempting to send commands to a stopped actor.
-	// Actors in Stopping, Done, StoppedWithError, Cancelled, or Panicked states cannot receive messages.
+	// Actors in Stopping, Done, StoppedWithError, Canceled, or Panicked states cannot receive messages.
 	ErrActorReceiveOnStopped = errors.New("actor receive on stopped actor")
 )
