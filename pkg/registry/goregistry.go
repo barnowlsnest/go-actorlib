@@ -490,16 +490,13 @@ func (gr *GoRegistry) StopAll() error {
 
 	// Stop all stoppable actors concurrently and wait for completion.
 	var wg sync.WaitGroup
-	var errMu sync.Mutex
 	for _, sa := range stoppableActors {
+		wg.Add(1)
 		stoppableActor := sa // capture
-		wg.Go(func() {
-			if err := stoppableActor.Stop(gr.stopTimeout); err != nil {
-				errMu.Lock()
-				joinErr = append(joinErr, err)
-				errMu.Unlock()
-			}
-		})
+		go func() {
+			defer wg.Done()
+			_ = stoppableActor.Stop(gr.stopTimeout)
+		}()
 	}
 	wg.Wait()
 

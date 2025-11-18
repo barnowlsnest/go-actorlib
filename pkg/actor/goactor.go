@@ -39,6 +39,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -147,7 +148,7 @@ type (
 	//   - Supervision and error handling through hooks
 	GoActor[T Entity] struct {
 		receiveTimeout time.Duration
-		inputBufSize   uint64
+		inputBufSize   int
 		state          uint64
 
 		input chan Executable[T]
@@ -226,10 +227,11 @@ func (ga *GoActor[T]) CheckState(state uint64) error {
 // This represents the maximum number of messages that can be queued
 // for processing before senders will block or timeout.
 func (ga *GoActor[T]) InputBufferSize() int {
-	if ga.inputBufSize > uint64(^uint(0)>>1) {
-		return int(^uint(0) >> 1)
+	if ga.inputBufSize > math.MaxInt {
+		return math.MaxInt
 	}
-	return int(ga.inputBufSize)
+
+	return ga.inputBufSize
 }
 
 // WaitReady blocks until the actor is ready to process messages or times out.
@@ -439,7 +441,7 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 //
 // A buffer size of 0 creates an unbuffered channel, which means senders
 // will block until the actor is ready to process the message.
-func WithInputBufferSize[T Entity](inputBufSize uint64) GoActorOption[T] {
+func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
 	return func(actor *GoActor[T]) *GoActor[T] {
 		actor.inputBufSize = inputBufSize
 		return actor

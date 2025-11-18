@@ -232,7 +232,7 @@ func (s *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
 
 func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSize() {
 	// Arrange
-	bufferSize := uint64(10)
+	bufferSize := 10
 
 	// Act
 	actor, err := New(
@@ -242,7 +242,7 @@ func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSiz
 
 	// Assert
 	s.NoError(err)
-	s.Equal(int(bufferSize), actor.InputBufferSize())
+	s.Equal(bufferSize, actor.InputBufferSize())
 }
 
 func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() {
