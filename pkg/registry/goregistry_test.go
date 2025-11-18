@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/barnowlsnest/go-actorlib/pkg/actor"
@@ -138,9 +136,7 @@ func (ma *MockActor) Name() string {
 }
 
 // MockEntity for testing command dispatching
-type MockEntity struct {
-	value string
-}
+type MockEntity struct{}
 
 func (me *MockEntity) IsProvidable() bool {
 	return true
@@ -203,14 +199,14 @@ type GoRegistryTestSuite struct {
 	registry *GoRegistry
 }
 
-func (suite *GoRegistryTestSuite) SetupTest() {
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-	suite.registry = New("test-registry")
+func (s *GoRegistryTestSuite) SetupTest() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.registry = New("test-registry")
 }
 
-func (suite *GoRegistryTestSuite) TearDownTest() {
-	if suite.cancel != nil {
-		suite.cancel()
+func (s *GoRegistryTestSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
 	}
 }
 
@@ -219,20 +215,20 @@ func TestGoRegistryTestSuite(t *testing.T) {
 }
 
 // Test registry creation and configuration
-func (suite *GoRegistryTestSuite) TestNew_WithDefaultOptions_ShouldCreateRegistry() {
+func (s *GoRegistryTestSuite) TestNew_WithDefaultOptions_ShouldCreateRegistry() {
 	// Act
 	registry := New("test-tag")
 
 	// Assert
-	require.NotNil(suite.T(), registry)
-	assert.Equal(suite.T(), "test-tag", registry.Tag())
-	assert.Equal(suite.T(), 5*time.Second, registry.startTimeout)
-	assert.Equal(suite.T(), 5*time.Second, registry.stopTimeout)
-	assert.NotNil(suite.T(), registry.actors)
-	assert.NotNil(suite.T(), registry.lookupTable)
+	s.NotNil(registry)
+	s.Equal("test-tag", registry.Tag())
+	s.Equal(5*time.Second, registry.startTimeout)
+	s.Equal(5*time.Second, registry.stopTimeout)
+	s.NotNil(registry.actors)
+	s.NotNil(registry.lookupTable)
 }
 
-func (suite *GoRegistryTestSuite) TestNew_WithCustomTimeouts_ShouldSetCorrectValues() {
+func (s *GoRegistryTestSuite) TestNew_WithCustomTimeouts_ShouldSetCorrectValues() {
 	// Arrange
 	startTimeout := 10 * time.Second
 	stopTimeout := 15 * time.Second
@@ -244,11 +240,11 @@ func (suite *GoRegistryTestSuite) TestNew_WithCustomTimeouts_ShouldSetCorrectVal
 	)
 
 	// Assert
-	assert.Equal(suite.T(), startTimeout, registry.startTimeout)
-	assert.Equal(suite.T(), stopTimeout, registry.stopTimeout)
+	s.Equal(startTimeout, registry.startTimeout)
+	s.Equal(stopTimeout, registry.stopTimeout)
 }
 
-func (suite *GoRegistryTestSuite) TestTag_ShouldReturnCorrectTag() {
+func (s *GoRegistryTestSuite) TestTag_ShouldReturnCorrectTag() {
 	// Arrange
 	expectedTag := "custom-registry-tag"
 	registry := New(expectedTag)
@@ -257,476 +253,491 @@ func (suite *GoRegistryTestSuite) TestTag_ShouldReturnCorrectTag() {
 	tag := registry.Tag()
 
 	// Assert
-	assert.Equal(suite.T(), expectedTag, tag)
+	s.Equal(expectedTag, tag)
 }
 
 // Test actor registration and lookup
-func (suite *GoRegistryTestSuite) TestRegister_WithValidActor_ShouldReturnUUID() {
+func (s *GoRegistryTestSuite) TestRegister_WithValidActor_ShouldReturnUUID() {
 	// Arrange
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
 
 	// Act
-	id, err := suite.registry.Register("test-actor", mockActor)
+	id, err := s.registry.Register("test-actor", mockActor)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.NotEqual(suite.T(), uuid.Nil, id)
+	s.NoError(err)
+	s.NotEqual(uuid.Nil, id)
 }
 
-func (suite *GoRegistryTestSuite) TestRegister_WithNilActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestRegister_WithNilActor_ShouldReturnError() {
 	// Act
-	id, err := suite.registry.Register("nil-actor", nil)
+	id, err := s.registry.Register("nil-actor", nil)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), uuid.Nil, id)
-	assert.Equal(suite.T(), ErrNilActor, err)
+	s.Error(err)
+	s.Equal(uuid.Nil, id)
+	s.ErrorIs(ErrNilActor, err)
 }
 
-func (suite *GoRegistryTestSuite) TestRegister_WithNotRunnableActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestRegister_WithNotRunnableActor_ShouldReturnError() {
 	// Arrange
 	notRunnable := &NotRunnableActor{name: "not-runnable"}
 
 	// Act
-	id, err := suite.registry.Register("not-runnable", notRunnable)
+	id, err := s.registry.Register("not-runnable", notRunnable)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), uuid.Nil, id)
-	assert.Equal(suite.T(), ErrActorIsNotRunnable, err)
+	s.Error(err)
+	s.Equal(uuid.Nil, id)
+	s.ErrorIs(ErrActorIsNotRunnable, err)
 }
 
-func (suite *GoRegistryTestSuite) TestRegister_WithNotActionableActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestRegister_WithNotActionableActor_ShouldReturnError() {
 	// Arrange
 	notActionable := &NotActionableActor{name: "not-actionable"}
 
 	// Act
-	id, err := suite.registry.Register("not-actionable", notActionable)
+	id, err := s.registry.Register("not-actionable", notActionable)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), uuid.Nil, id)
-	assert.Equal(suite.T(), ErrActorIsNotActionable, err)
+	s.Error(err)
+	s.Equal(uuid.Nil, id)
+	s.ErrorIs(ErrActorIsNotActionable, err)
 }
 
-func (suite *GoRegistryTestSuite) TestRegister_WithInvalidState_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestRegister_WithInvalidState_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("invalid-state", uint64(actor.Done))
 
 	// Act
-	id, err := suite.registry.Register("invalid-state", mockActor)
+	id, err := s.registry.Register("invalid-state", mockActor)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), uuid.Nil, id)
-	assert.Equal(suite.T(), ErrActorIsNotRunnable, err)
+	s.Error(err)
+	s.Equal(uuid.Nil, id)
+	s.ErrorIs(ErrActorIsNotRunnable, err)
 }
 
-func (suite *GoRegistryTestSuite) TestGet_WithExistingActor_ShouldReturnModel() {
+func (s *GoRegistryTestSuite) TestGet_WithExistingActor_ShouldReturnModel() {
 	// Arrange
 	mockActor := NewMockActor("existing-actor", uint64(actor.Initialized))
-	id, err := suite.registry.Register("existing-actor", mockActor)
-	require.NoError(suite.T(), err)
+	id, err := s.registry.Register("existing-actor", mockActor)
+	s.NoError(err)
 
 	// Act
-	model, err := suite.registry.Get("existing-actor")
+	model, err := s.registry.Get("existing-actor")
 
 	// Assert
-	require.NoError(suite.T(), err)
-	require.NotNil(suite.T(), model)
-	assert.Equal(suite.T(), id, model.ID)
-	assert.Equal(suite.T(), "existing-actor", model.Name)
-	assert.Equal(suite.T(), uint64(actor.Initialized), model.State)
+	s.NoError(err)
+	s.NotNil(model)
+	s.Equal(id, model.ID)
+	s.Equal("existing-actor", model.Name)
+	s.Equal(uint64(actor.Initialized), model.State)
 }
 
-func (suite *GoRegistryTestSuite) TestGet_WithNonExistentActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestGet_WithNonExistentActor_ShouldReturnError() {
 	// Act
-	model, err := suite.registry.Get("non-existent")
+	model, err := s.registry.Get("non-existent")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Nil(suite.T(), model)
-	assert.Equal(suite.T(), ErrActorNotFound, err)
+	s.Error(err)
+	s.Nil(model)
+	s.Equal(ErrActorNotFound, err)
 }
 
-func (suite *GoRegistryTestSuite) TestGetAll_WithMultipleActors_ShouldReturnAllModels() {
+func (s *GoRegistryTestSuite) TestGetAll_WithMultipleActors_ShouldReturnAllModels() {
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", actor.Started)
 
-	id1, err := suite.registry.Register("actor1", actor1)
-	require.NoError(suite.T(), err)
+	id1, err := s.registry.Register("actor1", actor1)
+	s.NoError(err)
 
-	id2, err := suite.registry.Register("actor2", actor2)
-	require.NoError(suite.T(), err)
+	id2, err := s.registry.Register("actor2", actor2)
+	s.NoError(err)
 
 	// Act
-	models := suite.registry.GetAll()
+	models := s.registry.GetAll()
 
 	// Assert
-	assert.Len(suite.T(), models, 2)
+	s.Len(models, 2)
 
 	// Find models by ID
 	var model1, model2 *Model
 	for i := range models {
-		if models[i].ID == id1 {
+		switch models[i].ID {
+		case id1:
 			model1 = &models[i]
-		} else if models[i].ID == id2 {
+		case id2:
 			model2 = &models[i]
 		}
 	}
 
-	require.NotNil(suite.T(), model1)
-	require.NotNil(suite.T(), model2)
+	s.NotNil(model1)
+	s.NotNil(model2)
 
-	assert.Equal(suite.T(), "actor1", model1.Name)
-	assert.Equal(suite.T(), uint64(actor.Initialized), model1.State)
+	s.Equal("actor1", model1.Name)
+	s.Equal(uint64(actor.Initialized), model1.State)
 
-	assert.Equal(suite.T(), "actor2", model2.Name)
-	assert.Equal(suite.T(), uint64(actor.Started), model2.State)
+	s.Equal("actor2", model2.Name)
+	s.Equal(uint64(actor.Started), model2.State)
 }
 
-func (suite *GoRegistryTestSuite) TestGetAll_WithNoActors_ShouldReturnEmptySlice() {
+func (s *GoRegistryTestSuite) TestGetAll_WithNoActors_ShouldReturnEmptySlice() {
 	// Act
-	models := suite.registry.GetAll()
+	models := s.registry.GetAll()
 
 	// Assert
-	assert.Empty(suite.T(), models)
-	assert.NotNil(suite.T(), models)
+	s.Empty(models)
+	s.NotNil(models)
 }
 
 // Test actor lifecycle management
-func (suite *GoRegistryTestSuite) TestStart_WithValidActor_ShouldStartSuccessfully() {
+func (s *GoRegistryTestSuite) TestStart_WithValidActor_ShouldStartSuccessfully() {
 	// Arrange
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
-	_, err := suite.registry.Register("test-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("test-actor", mockActor)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Start(suite.ctx, "test-actor")
+	err = s.registry.Start(s.ctx, "test-actor")
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.True(suite.T(), mockActor.IsStarted())
-	assert.Equal(suite.T(), uint64(actor.Started), mockActor.State())
+	s.NoError(err)
+	s.True(mockActor.IsStarted())
+	s.Equal(uint64(actor.Started), mockActor.State())
 }
 
-func (suite *GoRegistryTestSuite) TestStart_WithNonExistentActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestStart_WithNonExistentActor_ShouldReturnError() {
 	// Act
-	err := suite.registry.Start(suite.ctx, "non-existent")
+	err := s.registry.Start(s.ctx, "non-existent")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorNotFound)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorNotFound)
 }
 
-func (suite *GoRegistryTestSuite) TestStart_WithAlreadyStartedActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestStart_WithAlreadyStartedActor_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("started-actor", uint64(actor.Started))
-	_, err := suite.registry.Register("started-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("started-actor", mockActor)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Start(suite.ctx, "started-actor")
+	err = s.registry.Start(s.ctx, "started-actor")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorAlreadyStarted)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorAlreadyStarted)
 }
 
-func (suite *GoRegistryTestSuite) TestStart_WithWaitReadyFailure_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestStart_WithWaitReadyFailure_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("wait-fail-actor", uint64(actor.Initialized))
 	mockActor.SetWaitError(errors.New("wait failed"))
-	_, err := suite.registry.Register("wait-fail-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("wait-fail-actor", mockActor)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Start(suite.ctx, "wait-fail-actor")
+	err = s.registry.Start(s.ctx, "wait-fail-actor")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorIsNotRunnable)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorIsNotRunnable)
 }
 
-func (suite *GoRegistryTestSuite) TestStartAll_WithMultipleActors_ShouldStartAll() {
+func (s *GoRegistryTestSuite) TestStartAll_WithMultipleActors_ShouldStartAll() {
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", uint64(actor.Initialized))
 
-	_, err := suite.registry.Register("actor1", actor1)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("actor1", actor1)
+	s.NoError(err)
 
-	_, err = suite.registry.Register("actor2", actor2)
-	require.NoError(suite.T(), err)
+	_, err = s.registry.Register("actor2", actor2)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.StartAll(suite.ctx)
+	err = s.registry.StartAll(s.ctx)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.True(suite.T(), actor1.IsStarted())
-	assert.True(suite.T(), actor2.IsStarted())
+	s.NoError(err)
+	s.True(actor1.IsStarted())
+	s.True(actor2.IsStarted())
 }
 
-func (suite *GoRegistryTestSuite) TestStartAll_WithSomeFailures_ShouldReturnCollectedErrors() {
+func (s *GoRegistryTestSuite) TestStartAll_WithSomeFailures_ShouldReturnCollectedErrors() {
 	// Arrange
 	actor1 := NewMockActor("success-actor", uint64(actor.Initialized))
 	actor2 := NewMockActor("fail-actor", uint64(actor.Initialized))
 	actor2.SetWaitError(errors.New("wait failed"))
 
-	_, err := suite.registry.Register("success-actor", actor1)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("success-actor", actor1)
+	s.NoError(err)
 
-	_, err = suite.registry.Register("fail-actor", actor2)
-	require.NoError(suite.T(), err)
+	_, err = s.registry.Register("fail-actor", actor2)
+	s.NoError(err)
 
 	// Don't register the stopped actor as it should fail
-	// _, err = suite.registry.Register("stopped-actor", actor3)
-	// require.NoError(suite.T(), err)
+	// _, err = s.registry.Register("stopped-actor", actor3)
+	// s.NoError(err)
 	// Act
-	err = suite.registry.StartAll(suite.ctx)
+	err = s.registry.StartAll(s.ctx)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.True(suite.T(), actor1.IsStarted())
-	assert.True(suite.T(), actor2.IsStarted()) // Should have started despite wait error
+	s.Error(err)
+	s.True(actor1.IsStarted())
+	s.True(actor2.IsStarted()) // Should have started despite wait error
 	// actor3 was not registered, so no assertion needed
 }
 
 // Test actor stopping
-func (suite *GoRegistryTestSuite) TestStop_WithStartedActor_ShouldStopSuccessfully() {
+func (s *GoRegistryTestSuite) TestStop_WithStartedActor_ShouldStopSuccessfully() {
 	// Arrange
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
-	_, err := suite.registry.Register("test-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("test-actor", mockActor)
+	s.NoError(err)
 
-	err = suite.registry.Start(suite.ctx, "test-actor")
-	require.NoError(suite.T(), err)
+	err = s.registry.Start(s.ctx, "test-actor")
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Stop("test-actor")
+	err = s.registry.Stop("test-actor")
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.True(suite.T(), mockActor.IsStopped())
-	assert.Equal(suite.T(), uint64(actor.Done), mockActor.State())
+	s.NoError(err)
+	s.True(mockActor.IsStopped())
+	s.Equal(uint64(actor.Done), mockActor.State())
 }
 
-func (suite *GoRegistryTestSuite) TestStop_WithNonExistentActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestStop_WithNonExistentActor_ShouldReturnError() {
 	// Act
-	err := suite.registry.Stop("non-existent")
+	err := s.registry.Stop("non-existent")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorNotFound)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorNotFound)
 }
 
-func (suite *GoRegistryTestSuite) TestStop_WithNotStartedActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestStop_WithNotStartedActor_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("not-started-actor", uint64(actor.Initialized))
-	_, err := suite.registry.Register("not-started-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("not-started-actor", mockActor)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Stop("not-started-actor")
+	err = s.registry.Stop("not-started-actor")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorNotStarted)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorNotStarted)
 }
 
-func (suite *GoRegistryTestSuite) TestStopAll_WithMultipleStartedActors_ShouldStopAll() {
+func (s *GoRegistryTestSuite) TestStopAll_WithMultipleStartedActors_ShouldStopAll() {
 	// Arrange
 	actor1 := NewMockActor("actor1", uint64(actor.Initialized))
 	actor2 := NewMockActor("actor2", uint64(actor.Initialized))
 
-	_, err := suite.registry.Register("actor1", actor1)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("actor1", actor1)
+	s.NoError(err)
 
-	_, err = suite.registry.Register("actor2", actor2)
-	require.NoError(suite.T(), err)
+	_, err = s.registry.Register("actor2", actor2)
+	s.NoError(err)
 
-	err = suite.registry.StartAll(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = s.registry.StartAll(s.ctx)
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.StopAll()
+	err = s.registry.StopAll()
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.True(suite.T(), actor1.IsStopped())
-	assert.True(suite.T(), actor2.IsStopped())
+	s.NoError(err)
+	s.True(actor1.IsStopped())
+	s.True(actor2.IsStopped())
 }
 
-func (suite *GoRegistryTestSuite) TestStopAll_WithMixedStates_ShouldStopOnlyStarted() {
+func (s *GoRegistryTestSuite) TestStopAll_WithMixedStates_ShouldStopOnlyStarted() {
 	// Arrange
 	actor1 := NewMockActor("started-actor", uint64(actor.Initialized))
 	actor2 := NewMockActor("not-started-actor", uint64(actor.Initialized))
 
-	_, err := suite.registry.Register("started-actor", actor1)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("started-actor", actor1)
+	s.NoError(err)
 
-	_, err = suite.registry.Register("not-started-actor", actor2)
-	require.NoError(suite.T(), err)
+	_, err = s.registry.Register("not-started-actor", actor2)
+	s.NoError(err)
 
-	err = suite.registry.Start(suite.ctx, "started-actor")
-	require.NoError(suite.T(), err)
+	err = s.registry.Start(s.ctx, "started-actor")
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.StopAll()
+	err = s.registry.StopAll()
 
 	// Assert - Should have errors for the not-started actor
-	assert.Error(suite.T(), err)
-	assert.True(suite.T(), actor1.IsStopped())
-	assert.False(suite.T(), actor2.IsStopped())
+	s.Error(err)
+	s.True(actor1.IsStopped())
+	s.False(actor2.IsStopped())
 }
 
 // Test actor unregistration
-func (suite *GoRegistryTestSuite) TestUnregister_WithStoppedActor_ShouldRemoveActor() {
+func (s *GoRegistryTestSuite) TestUnregister_WithStoppedActor_ShouldRemoveActor() {
 	// Arrange
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
-	_, err := suite.registry.Register("test-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("test-actor", mockActor)
+	s.NoError(err)
 
-	err = suite.registry.Start(suite.ctx, "test-actor")
-	require.NoError(suite.T(), err)
+	err = s.registry.Start(s.ctx, "test-actor")
+	s.NoError(err)
 
-	err = suite.registry.Stop("test-actor")
-	require.NoError(suite.T(), err)
+	err = s.registry.Stop("test-actor")
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Unregister("test-actor")
+	err = s.registry.Unregister("test-actor")
 
 	// Assert
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Verify actor is removed
-	_, err = suite.registry.Get("test-actor")
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorNotFound, err)
+	_, err = s.registry.Get("test-actor")
+	s.Error(err)
+	s.Equal(ErrActorNotFound, err)
 }
 
-func (suite *GoRegistryTestSuite) TestUnregister_WithNonExistentActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestUnregister_WithNonExistentActor_ShouldReturnError() {
 	// Act
-	err := suite.registry.Unregister("non-existent")
+	err := s.registry.Unregister("non-existent")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorNotFound, err)
+	s.Error(err)
+	s.Equal(ErrActorNotFound, err)
 }
 
-func (suite *GoRegistryTestSuite) TestUnregister_WithRunningActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestUnregister_WithRunningActor_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("running-actor", uint64(actor.Initialized))
-	_, err := suite.registry.Register("running-actor", mockActor)
-	require.NoError(suite.T(), err)
+	_, err := s.registry.Register("running-actor", mockActor)
+	s.NoError(err)
 
-	err = suite.registry.Start(suite.ctx, "running-actor")
-	require.NoError(suite.T(), err)
+	err = s.registry.Start(s.ctx, "running-actor")
+	s.NoError(err)
 
 	// Act
-	err = suite.registry.Unregister("running-actor")
+	err = s.registry.Unregister("running-actor")
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorIsNotStopped)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorIsNotStopped)
 }
 
 // Test command dispatching
-func (suite *GoRegistryTestSuite) TestDispatch_WithValidActor_ShouldDispatchCommand() {
+func (s *GoRegistryTestSuite) TestDispatch_WithValidActor_ShouldDispatchCommand() {
 	// Arrange
 	mockActor := NewMockActor("test-actor", uint64(actor.Initialized))
-	id, err := suite.registry.Register("test-actor", mockActor)
-	require.NoError(suite.T(), err)
+	id, err := s.registry.Register("test-actor", mockActor)
+	s.NoError(err)
 
 	command := NewMockCommand("test-command")
 
 	// Act
-	err = suite.registry.Dispatch(suite.ctx, id, command)
+	err = s.registry.Dispatch(s.ctx, id, command)
 
 	// Assert
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 	commands := mockActor.GetCommands()
-	assert.Len(suite.T(), commands, 1)
-	assert.Equal(suite.T(), command, commands[0])
+	s.Len(commands, 1)
+	s.Equal(command, commands[0])
 }
 
-func (suite *GoRegistryTestSuite) TestDispatch_WithNonExistentActor_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestDispatch_WithNonExistentActor_ShouldReturnError() {
 	// Arrange
 	nonExistentID := uuid.New()
 	command := NewMockCommand("test-command")
 
 	// Act
-	err := suite.registry.Dispatch(suite.ctx, nonExistentID, command)
+	err := s.registry.Dispatch(s.ctx, nonExistentID, command)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.ErrorIs(suite.T(), err, ErrActorNotFound)
+	s.Error(err)
+	s.ErrorIs(err, ErrActorNotFound)
 }
 
 // Test concurrent access
-func (suite *GoRegistryTestSuite) TestConcurrentOperations_ShouldBeSafe() {
+func (s *GoRegistryTestSuite) TestConcurrentOperations_ShouldBeSafe() {
 	// Arrange
 	var wg sync.WaitGroup
 	numOperations := 50
 
 	// Act - Perform concurrent registrations, starts, stops, and lookups
 	for i := 0; i < numOperations; i++ {
-		wg.Add(4)
+		wg.Go(func(index int) func() {
+			return func() {
+				mockActor := NewMockActor(fmt.Sprintf("actor-%d", index), uint64(actor.Initialized))
+				_, err := s.registry.Register(fmt.Sprintf("actor-%d", index), mockActor)
+				if err != nil {
+					s.T().Logf("Register actor-%d: %v", index, err)
+				}
+			}
+		}(i))
 
-		go func(index int) {
-			defer wg.Done()
-			mockActor := NewMockActor(fmt.Sprintf("actor-%d", index), uint64(actor.Initialized))
-			suite.registry.Register(fmt.Sprintf("actor-%d", index), mockActor)
-		}(i)
+		wg.Go(func(index int) func() {
+			return func() {
+				time.Sleep(10 * time.Millisecond)
+				err := s.registry.Start(s.ctx, fmt.Sprintf("actor-%d", index))
+				if err != nil {
+					s.T().Logf("Start actor-%d: %v", index, err)
+				}
+			}
+		}(i))
 
-		go func(index int) {
-			defer wg.Done()
-			time.Sleep(10 * time.Millisecond) // Give registration time
-			suite.registry.Start(suite.ctx, fmt.Sprintf("actor-%d", index))
-		}(i)
+		wg.Go(func(index int) func() {
+			return func() {
+				time.Sleep(20 * time.Millisecond)
+				err := s.registry.Stop(fmt.Sprintf("actor-%d", index))
+				if err != nil {
+					s.T().Logf("Stop actor-%d: %v", index, err)
+				}
+			}
+		}(i))
 
-		go func(index int) {
-			defer wg.Done()
-			time.Sleep(20 * time.Millisecond) // Give start time
-			suite.registry.Stop(fmt.Sprintf("actor-%d", index))
-		}(i)
-
-		go func(index int) {
-			defer wg.Done()
-			suite.registry.Get(fmt.Sprintf("actor-%d", index))
-		}(i)
+		wg.Go(func(index int) func() {
+			return func() {
+				_, err := s.registry.Get(fmt.Sprintf("actor-%d", index))
+				if err != nil {
+					s.T().Logf("Get actor-%d: %v", index, err)
+				}
+			}
+		}(i))
 	}
 
 	// Assert - No panics, operations complete
-	assert.NotPanics(suite.T(), func() {
+	s.NotPanics(func() {
 		wg.Wait()
 	})
 }
 
 // Test error cases and edge conditions
-func (suite *GoRegistryTestSuite) TestMustBeRunnable_WithNil_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestMustBeRunnable_WithNil_ShouldReturnError() {
 	// Act
 	runnable, err := mustBeRunnable(nil)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Nil(suite.T(), runnable)
-	assert.Equal(suite.T(), ErrNilActor, err)
+	s.Error(err)
+	s.Nil(runnable)
+	s.Equal(ErrNilActor, err)
 }
 
-func (suite *GoRegistryTestSuite) TestMustBeActionable_WithNil_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestMustBeActionable_WithNil_ShouldReturnError() {
 	// Act
 	actionable, err := mustBeActionable(nil)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Nil(suite.T(), actionable)
-	assert.Equal(suite.T(), ErrNilActor, err)
+	s.Error(err)
+	s.Nil(actionable)
+	s.Equal(ErrNilActor, err)
 }
 
-func (suite *GoRegistryTestSuite) TestMustBeRunnable_WithUnknownState_ShouldReturnError() {
+func (s *GoRegistryTestSuite) TestMustBeRunnable_WithUnknownState_ShouldReturnError() {
 	// Arrange
 	mockActor := NewMockActor("unknown-state", 999) // Invalid state
 
@@ -734,9 +745,9 @@ func (suite *GoRegistryTestSuite) TestMustBeRunnable_WithUnknownState_ShouldRetu
 	runnable, err := mustBeRunnable(mockActor)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Nil(suite.T(), runnable)
-	assert.Equal(suite.T(), ErrUnknownActorState, err)
+	s.Error(err)
+	s.Nil(runnable)
+	s.Equal(ErrUnknownActorState, err)
 }
 
 // Benchmark tests
@@ -746,7 +757,9 @@ func BenchmarkGoRegistry_Register(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
-		registry.Register(fmt.Sprintf("actor-%d", i), mockActor)
+		if _, err := registry.Register(fmt.Sprintf("actor-%d", i), mockActor); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -756,12 +769,16 @@ func BenchmarkGoRegistry_Get(b *testing.B) {
 	// Setup actors
 	for i := 0; i < 1000; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
-		registry.Register(fmt.Sprintf("actor-%d", i), mockActor)
+		if _, err := registry.Register(fmt.Sprintf("actor-%d", i), mockActor); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		registry.Get(fmt.Sprintf("actor-%d", i%1000))
+		if _, err := registry.Get(fmt.Sprintf("actor-%d", i%1000)); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -771,13 +788,17 @@ func BenchmarkGoRegistry_ConcurrentAccess(b *testing.B) {
 	// Setup some actors
 	for i := 0; i < 100; i++ {
 		mockActor := NewMockActor(fmt.Sprintf("actor-%d", i), uint64(actor.Initialized))
-		registry.Register(fmt.Sprintf("actor-%d", i), mockActor)
+		if _, err := registry.Register(fmt.Sprintf("actor-%d", i), mockActor); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			registry.Get(fmt.Sprintf("actor-%d", b.N%100))
+			if _, err := registry.Get(fmt.Sprintf("actor-%d", b.N%100)); err != nil {
+				b.Fatal(err)
+			}
 			registry.GetAll()
 		}
 	})

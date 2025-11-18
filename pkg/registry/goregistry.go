@@ -53,9 +53,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/pkg/actor"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/barnowlsnest/go-actorlib/pkg/actor"
 )
 
 type (
@@ -335,7 +336,7 @@ func (gr *GoRegistry) getRunnable(name string) (Runnable, error) {
 		runnableActor = model.actor
 	case actor.Started:
 		return nil, ErrActorAlreadyStarted
-	case actor.Stopping, actor.Done, actor.StoppedWithError, actor.Cancelled, actor.Panicked:
+	case actor.Stopping, actor.Done, actor.StoppedWithError, actor.Canceled, actor.Panicked:
 		return nil, ErrActorIsNotRunnable
 	default: // Unknown state
 		return nil, ErrUnknownActorState
@@ -365,7 +366,7 @@ func (gr *GoRegistry) getStoppable(name string) (Runnable, error) {
 		return nil, ErrActorNotStarted
 	case actor.Started:
 		stoppableActor = model.actor
-	case actor.Stopping, actor.Done, actor.StoppedWithError, actor.Cancelled, actor.Panicked:
+	case actor.Stopping, actor.Done, actor.StoppedWithError, actor.Canceled, actor.Panicked:
 		return nil, ErrActorAlreadyStopped
 	default: // Unknown state
 		return nil, ErrUnknownActorState
@@ -391,8 +392,8 @@ func (gr *GoRegistry) Start(ctx context.Context, name string) error {
 	}
 	gr.mu.Unlock()
 
-	if err = runnableActor.Start(ctx); err != nil {
-		return err
+	if errStart := runnableActor.Start(ctx); errStart != nil {
+		return errStart
 	}
 
 	if errReady := runnableActor.WaitReady(ctx, gr.startTimeout); errReady != nil {
@@ -460,8 +461,8 @@ func (gr *GoRegistry) Stop(name string) error {
 		return errors.Join(fmt.Errorf("failed to stop actor: '%s'", name), err)
 	}
 	gr.mu.Unlock()
-	if err = stoppableActor.Stop(gr.stopTimeout); err != nil {
-		return err
+	if errStop := stoppableActor.Stop(gr.stopTimeout); errStop != nil {
+		return errStop
 	}
 
 	return nil
@@ -526,7 +527,7 @@ func (gr *GoRegistry) Unregister(name string) error {
 	}
 
 	switch entry.actor.State() {
-	case actor.Done, actor.StoppedWithError, actor.Cancelled, actor.Panicked:
+	case actor.Done, actor.StoppedWithError, actor.Canceled, actor.Panicked:
 		delete(gr.lookupTable, name)
 		delete(gr.actors, id)
 		return nil

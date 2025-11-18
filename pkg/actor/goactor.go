@@ -39,6 +39,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -67,9 +68,9 @@ const (
 	// This is a terminal state indicating abnormal termination.
 	StoppedWithError
 
-	// Cancelled indicates the actor was stopped due to context cancellation.
+	// Canceled indicates the actor was stopped due to context cancellation.
 	// This is a terminal state indicating cancellation-based termination.
-	Cancelled
+	Canceled
 
 	// Panicked indicates the actor stopped due to a recovered panic.
 	// This is a terminal state indicating panic-based termination.
@@ -147,7 +148,7 @@ type (
 	//   - Supervision and error handling through hooks
 	GoActor[T Entity] struct {
 		receiveTimeout time.Duration
-		inputBufSize   uint64
+		inputBufSize   int
 		state          uint64
 
 		input chan Executable[T]
@@ -226,7 +227,11 @@ func (ga *GoActor[T]) CheckState(state uint64) error {
 // This represents the maximum number of messages that can be queued
 // for processing before senders will block or timeout.
 func (ga *GoActor[T]) InputBufferSize() int {
-	return int(ga.inputBufSize)
+	if ga.inputBufSize > math.MaxInt {
+		return math.MaxInt
+	}
+
+	return ga.inputBufSize
 }
 
 // WaitReady blocks until the actor is ready to process messages or times out.
@@ -234,7 +239,7 @@ func (ga *GoActor[T]) InputBufferSize() int {
 // This method should be called after Start() to ensure the actor has
 // completed initialization and is ready to receive commands.
 //
-// Returns an error if the context is cancelled, the timeout is exceeded,
+// Returns an error if the context is canceled, the timeout is exceeded,
 // or the actor fails to start properly.
 func (ga *GoActor[T]) WaitReady(ctx context.Context, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
@@ -279,7 +284,7 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 
 	switch {
 	case errors.Is(err, context.Canceled):
-		atomic.StoreUint64(&ga.state, Cancelled)
+		atomic.StoreUint64(&ga.state, Canceled)
 		ga.hooks.OnError(ErrActorContextCanceled)
 	case errors.Is(err, context.DeadlineExceeded):
 		atomic.StoreUint64(&ga.state, StoppedWithError)
@@ -299,7 +304,7 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 // Returns an error if:
 //   - The executable is nil
 //   - The actor is not in Started state
-//   - The context is cancelled
+//   - The context is canceled
 //   - The receive timeout is exceeded
 func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	if e == nil {
@@ -321,7 +326,7 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 
 // Start begins the actor's message processing loop in a new goroutine.
 //
-// The actor will remain active until the context is cancelled or Stop is called.
+// The actor will remain active until the context is canceled or Stop is called.
 // The provided entity must be valid (non-nil and IsProvidable() returns true).
 //
 // Lifecycle hooks are called in this order:
@@ -436,7 +441,7 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 //
 // A buffer size of 0 creates an unbuffered channel, which means senders
 // will block until the actor is ready to process the message.
-func WithInputBufferSize[T Entity](inputBufSize uint64) GoActorOption[T] {
+func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
 	return func(actor *GoActor[T]) *GoActor[T] {
 		actor.inputBufSize = inputBufSize
 		return actor
@@ -446,7 +451,7 @@ func WithInputBufferSize[T Entity](inputBufSize uint64) GoActorOption[T] {
 // WithReceiveTimeout configures how long senders will wait to queue messages.
 //
 // If set to 0, the Receive method will block indefinitely until the message
-// can be queued or the context is cancelled.
+// can be queued or the context is canceled.
 //
 // If set to a positive duration, Receive will return an error if the message
 // cannot be queued within that timeframe. The default timeout is 5 seconds.

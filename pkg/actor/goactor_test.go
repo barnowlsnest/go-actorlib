@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -190,16 +188,16 @@ type GoActorTestSuite struct {
 	hooks    *TestHooks
 }
 
-func (suite *GoActorTestSuite) SetupTest() {
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-	suite.entity = NewTestEntity("test-value", true)
-	suite.provider = NewTestEntityProvider(suite.entity)
-	suite.hooks = NewTestHooks()
+func (s *GoActorTestSuite) SetupTest() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.entity = NewTestEntity("test-value", true)
+	s.provider = NewTestEntityProvider(s.entity)
+	s.hooks = NewTestHooks()
 }
 
-func (suite *GoActorTestSuite) TearDownTest() {
-	if suite.cancel != nil {
-		suite.cancel()
+func (s *GoActorTestSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
 	}
 }
 
@@ -208,233 +206,233 @@ func TestGoActorTestSuite(t *testing.T) {
 }
 
 // Test actor creation and configuration
-func (suite *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
+func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 	// Act
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
+	actor, err := New(WithProvider[*TestEntity](s.provider))
 
 	// Assert
-	require.NoError(suite.T(), err)
-	require.NotNil(suite.T(), actor)
-	assert.Equal(suite.T(), uint64(Initialized), actor.State())
-	assert.Equal(suite.T(), 1, actor.InputBufferSize())
-	assert.NotNil(suite.T(), actor.input)
-	assert.NotNil(suite.T(), actor.done)
-	assert.NotNil(suite.T(), actor.ready)
+	s.NoError(err)
+	s.NotNil(actor)
+	s.Equal(uint64(Initialized), actor.State())
+	s.Equal(1, actor.InputBufferSize())
+	s.NotNil(actor.input)
+	s.NotNil(actor.done)
+	s.NotNil(actor.ready)
 }
 
-func (suite *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
+func (s *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
 	// Act
 	actor, err := New[*TestEntity]()
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Nil(suite.T(), actor)
-	assert.Equal(suite.T(), ErrActorNilProvider, err)
+	s.Error(err)
+	s.Nil(actor)
+	s.Equal(ErrActorNilProvider, err)
 }
 
-func (suite *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSize() {
+func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSize() {
 	// Arrange
-	bufferSize := uint64(10)
+	bufferSize := 10
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
+		WithProvider[*TestEntity](s.provider),
 		WithInputBufferSize[*TestEntity](bufferSize),
 	)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), int(bufferSize), actor.InputBufferSize())
+	s.NoError(err)
+	s.Equal(bufferSize, actor.InputBufferSize())
 }
 
-func (suite *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() {
+func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() {
 	// Arrange
 	timeout := 10 * time.Second
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
+		WithProvider[*TestEntity](s.provider),
 		WithReceiveTimeout[*TestEntity](timeout),
 	)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), timeout, actor.receiveTimeout)
+	s.NoError(err)
+	s.Equal(timeout, actor.receiveTimeout)
 }
 
-func (suite *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
+func (s *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
-		WithHooks[*TestEntity](suite.hooks),
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](s.hooks),
 	)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), suite.hooks, actor.hooks)
+	s.NoError(err)
+	s.Equal(s.hooks, actor.hooks)
 }
 
-func (suite *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
+func (s *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
 	// Act
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
+	actor, err := New(WithProvider[*TestEntity](s.provider))
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.IsType(suite.T(), &noopHooks{}, actor.hooks)
+	s.NoError(err)
+	s.IsType(&noopHooks{}, actor.hooks)
 }
 
 // Test actor lifecycle
-func (suite *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
+func (s *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
-		WithHooks[*TestEntity](suite.hooks),
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](s.hooks),
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Act
-	err = actor.Start(suite.ctx)
+	err = actor.Start(s.ctx)
 
 	// Assert
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Wait for actor to be ready
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
-	assert.Equal(suite.T(), uint64(Started), actor.State())
+	s.Equal(uint64(Started), actor.State())
 
 	// Check hooks were called
-	calls := suite.hooks.GetCalls()
-	assert.Contains(suite.T(), calls, "BeforeStart:*actor.TestEntity")
-	assert.Contains(suite.T(), calls, "AfterStart")
+	calls := s.hooks.GetCalls()
+	s.Contains(calls, "BeforeStart:*actor.TestEntity")
+	s.Contains(calls, "AfterStart")
 }
 
-func (suite *GoActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
+func (s *GoActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
 	// Arrange - Create a provider that returns nil
 	nilProvider := &TestEntityProvider{entity: nil}
 	actor, err := New(WithProvider[*TestEntity](nilProvider))
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Act
-	err = actor.Start(suite.ctx)
+	err = actor.Start(s.ctx)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorNilEntity, err)
+	s.Error(err)
+	s.Equal(ErrActorNilEntity, err)
 }
 
-func (suite *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError() {
+func (s *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError() {
 	// Arrange
 	nonProvidableEntity := NewTestEntity("test", false)
 	nonProvidableProvider := NewTestEntityProvider(nonProvidableEntity)
 	actor, err := New(WithProvider[*TestEntity](nonProvidableProvider))
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Act
-	err = actor.Start(suite.ctx)
+	err = actor.Start(s.ctx)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorNilEntity, err)
+	s.Error(err)
+	s.Equal(ErrActorNilEntity, err)
 }
 
-func (suite *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
+func (s *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
-		WithHooks[*TestEntity](suite.hooks),
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](s.hooks),
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	// Act
 	err = actor.Stop(100 * time.Millisecond)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.Equal(suite.T(), uint64(Done), actor.State())
+	s.NoError(err)
+	s.Equal(uint64(Done), actor.State())
 
 	// Check hooks were called
-	calls := suite.hooks.GetCalls()
-	assert.Contains(suite.T(), calls, "BeforeStop:*actor.TestEntity")
-	assert.Contains(suite.T(), calls, "AfterStop")
+	calls := s.hooks.GetCalls()
+	s.Contains(calls, "BeforeStop:*actor.TestEntity")
+	s.Contains(calls, "AfterStop")
 }
 
-func (suite *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
+func (s *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
 	// Act
 	err = actor.Stop(100 * time.Millisecond)
 
 	// Assert
-	assert.Error(suite.T(), err)
+	s.Error(err)
 }
 
-func (suite *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
+func (s *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
 	// Act
-	err = actor.WaitReady(suite.ctx, 10*time.Millisecond)
+	err = actor.WaitReady(s.ctx, 10*time.Millisecond)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), context.DeadlineExceeded, err)
+	s.Error(err)
+	s.Equal(context.DeadlineExceeded, err)
 }
 
-func (suite *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
+func (s *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
 	// Act
 	start := time.Now()
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
 	duration := time.Since(start)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.Less(suite.T(), duration, 50*time.Millisecond)
+	s.NoError(err)
+	s.Less(duration, 50*time.Millisecond)
 }
 
-func (suite *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContextError() {
+func (s *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContextError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	suite.cancel() // Cancel context
+	s.cancel() // Cancel context
 
 	// Act
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), context.Canceled, err)
+	s.Error(err)
+	s.Equal(context.Canceled, err)
 }
 
 // Test message receiving and processing
-func (suite *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfully() {
+func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfully() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	executed := false
 	command := NewTestCommand("test-cmd", func(ctx context.Context, entity *TestEntity) {
@@ -443,117 +441,117 @@ func (suite *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccess
 	})
 
 	// Act
-	err = actor.Receive(suite.ctx, command)
+	err = actor.Receive(s.ctx, command)
 
 	// Give some time for command to execute
 	time.Sleep(10 * time.Millisecond)
 
 	// Assert
-	require.NoError(suite.T(), err)
-	assert.True(suite.T(), executed)
-	assert.True(suite.T(), command.IsExecuted())
+	s.NoError(err)
+	s.True(executed)
+	s.True(command.IsExecuted())
 
-	callLog := suite.entity.GetCallLog()
-	assert.Contains(suite.T(), callLog, "SetValue:updated-by-command")
+	callLog := s.entity.GetCallLog()
+	s.Contains(callLog, "SetValue:updated-by-command")
 }
 
-func (suite *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
+func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
 	// Act
-	err = actor.Receive(suite.ctx, nil)
+	err = actor.Receive(s.ctx, nil)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorReceiveNil, err)
+	s.Error(err)
+	s.Equal(ErrActorReceiveNil, err)
 }
 
-func (suite *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
+func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	err = actor.Stop(100 * time.Millisecond)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	command := NewTestCommand("test-cmd", nil)
 
 	// Act
-	err = actor.Receive(suite.ctx, command)
+	err = actor.Receive(s.ctx, command)
 
 	// Assert
-	assert.Error(suite.T(), err)
-	assert.Equal(suite.T(), ErrActorReceiveOnStopped, err)
+	s.Error(err)
+	s.Equal(ErrActorReceiveOnStopped, err)
 }
 
-func (suite *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
+func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 	// Arrange - zero timeout means no timeout
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
+		WithProvider[*TestEntity](s.provider),
 		WithInputBufferSize[*TestEntity](2),
 		WithReceiveTimeout[*TestEntity](0), // No timeout
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	command := NewTestCommand("test", func(ctx context.Context, entity *TestEntity) {
 		entity.SetValue("updated")
 	})
 
 	// Act
-	err = actor.Receive(suite.ctx, command)
+	err = actor.Receive(s.ctx, command)
 
 	// Assert
-	assert.NoError(suite.T(), err)
+	s.NoError(err)
 }
 
 // Test error handling and panic recovery
-func (suite *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
+func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
-		WithHooks[*TestEntity](suite.hooks),
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](s.hooks),
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	panicCommand := NewTestCommand("panic-cmd", func(ctx context.Context, entity *TestEntity) {
 		panic("test panic")
 	})
 
 	// Act
-	err = actor.Receive(suite.ctx, panicCommand)
-	require.NoError(suite.T(), err)
+	err = actor.Receive(s.ctx, panicCommand)
+	s.NoError(err)
 
 	// Give time for panic to be handled
 	time.Sleep(20 * time.Millisecond)
 
 	// Assert
-	assert.Equal(suite.T(), uint64(Panicked), actor.State())
+	s.Equal(uint64(Panicked), actor.State())
 
-	hookErrors := suite.hooks.GetErrors()
-	assert.NotEmpty(suite.T(), hookErrors)
+	hookErrors := s.hooks.GetErrors()
+	s.NotEmpty(hookErrors)
 
 	foundPanicError := false
 	for _, hookErr := range hookErrors {
@@ -562,7 +560,7 @@ func (suite *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 			break
 		}
 	}
-	assert.True(suite.T(), foundPanicError)
+	s.True(foundPanicError)
 }
 
 // PanicHooks implements Hooks interface and panics in AfterStart
@@ -575,58 +573,58 @@ func (ph *PanicHooks) AfterStart() {
 	panic("hook panic")
 }
 
-func (suite *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
+func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	// Arrange
 	baseHooks := NewTestHooks()
 	panicHooks := &PanicHooks{TestHooks: baseHooks}
 
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
+		WithProvider[*TestEntity](s.provider),
 		WithHooks[*TestEntity](panicHooks),
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
 	// Act
-	err = actor.Start(suite.ctx)
+	err = actor.Start(s.ctx)
 
 	// Assert
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	// Actor should still be running despite hook panic
 	// But it may have transitioned to Panicked state due to the panic
 	state := actor.State()
-	assert.True(suite.T(), state == uint64(Started) || state == uint64(Panicked))
+	s.True(state == uint64(Started) || state == uint64(Panicked))
 }
 
 // Test context handling
-func (suite *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
+func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](suite.provider),
-		WithHooks[*TestEntity](suite.hooks),
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](s.hooks),
 	)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	// Act
-	suite.cancel()
+	s.cancel()
 
 	// Give time for context cancellation to be processed
 	time.Sleep(20 * time.Millisecond)
 
 	// Assert
-	assert.Equal(suite.T(), uint64(Cancelled), actor.State())
+	s.Equal(uint64(Canceled), actor.State())
 
-	hookErrors := suite.hooks.GetErrors()
-	assert.NotEmpty(suite.T(), hookErrors)
+	hookErrors := s.hooks.GetErrors()
+	s.NotEmpty(hookErrors)
 
 	foundContextError := false
 	for _, hookErr := range hookErrors {
@@ -635,69 +633,69 @@ func (suite *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracef
 			break
 		}
 	}
-	assert.True(suite.T(), foundContextError)
+	s.True(foundContextError)
 }
 
 // Test state transitions
-func (suite *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
+func (s *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
 	// Assert initial state
-	assert.Equal(suite.T(), uint64(Initialized), actor.State())
+	s.Equal(uint64(Initialized), actor.State())
 
 	// Act & Assert - Start
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
-	assert.Equal(suite.T(), uint64(Started), actor.State())
+	s.Equal(uint64(Started), actor.State())
 
 	// Act & Assert - Stop
 	err = actor.Stop(100 * time.Millisecond)
-	require.NoError(suite.T(), err)
+	s.NoError(err)
 
-	assert.Equal(suite.T(), uint64(Done), actor.State())
+	s.Equal(uint64(Done), actor.State())
 }
 
-func (suite *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
+func (s *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
 	// Act
 	err = actor.CheckState(Initialized)
 
 	// Assert
-	assert.NoError(suite.T(), err)
+	s.NoError(err)
 }
 
-func (suite *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError() {
+func (s *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
 	// Act
 	err = actor.CheckState(Started)
 
 	// Assert
-	assert.Error(suite.T(), err)
+	s.Error(err)
 }
 
 // Test concurrent access
-func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
+func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](suite.provider))
-	require.NoError(suite.T(), err)
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
 
-	err = actor.Start(suite.ctx)
-	require.NoError(suite.T(), err)
+	err = actor.Start(s.ctx)
+	s.NoError(err)
 
-	err = actor.WaitReady(suite.ctx, 100*time.Millisecond)
-	require.NoError(suite.T(), err)
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
 
 	var wg sync.WaitGroup
 	var executionCount int64
@@ -712,10 +710,11 @@ func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 				time.Sleep(time.Millisecond) // Simulate work
 			})
 
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 			defer cancel()
 
-			actor.Receive(ctx, command)
+			errReceive := actor.Receive(ctx, command)
+			s.NoError(errReceive)
 		}(i)
 	}
 
@@ -726,7 +725,7 @@ func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
 				state := actor.State()
-				assert.True(suite.T(), state >= Initialized && state <= Panicked)
+				s.True(state >= Initialized && state <= Panicked)
 			}
 		}()
 	}
@@ -737,7 +736,7 @@ func (suite *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	time.Sleep(200 * time.Millisecond)
 
 	// Assert
-	assert.Greater(suite.T(), atomic.LoadInt64(&executionCount), int64(0))
+	s.Greater(atomic.LoadInt64(&executionCount), int64(0))
 }
 
 // Benchmark tests
@@ -758,8 +757,13 @@ func BenchmarkGoActor_CreateAndStart(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		actor.WaitReady(ctx, time.Second)
-		actor.Stop(time.Second)
+		if errReady := actor.WaitReady(ctx, time.Second); errReady != nil {
+			b.Fatal(errReady)
+		}
+
+		if errStop := actor.Stop(time.Second); errStop != nil {
+			b.Fatal(errStop)
+		}
 	}
 }
 
@@ -789,13 +793,14 @@ func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
 			entity.GetValue()
 		})
 
-		err := actor.Receive(ctx, command)
-		if err != nil {
-			b.Fatal(err)
+		if errReceive := actor.Receive(ctx, command); errReceive != nil {
+			b.Fatal(errReceive)
 		}
 	}
 
-	actor.Stop(time.Second)
+	if errStop := actor.Stop(time.Second); errStop != nil {
+		b.Fatal(errStop)
+	}
 }
 
 func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
@@ -825,5 +830,7 @@ func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
 		}
 	})
 
-	actor.Stop(time.Second)
+	if errStop := actor.Stop(time.Second); errStop != nil {
+		b.Fatal(errStop)
+	}
 }

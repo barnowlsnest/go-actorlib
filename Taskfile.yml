@@ -32,11 +32,17 @@ tasks:
       - go test -cover '{{.ALL_GO_FILES}}'
       - go test -bench=. '{{.ALL_GO_FILES}}'
 
-  check:
+  go-lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run
+
+  sanity:
     desc: Run all checks (fmt, build, test, vet)
     deps:
       - go:mod:tidy
       - go:fmt
+      - go-lint
       - go:build
       - go:vet
       - go:test
