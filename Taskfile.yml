@@ -50,20 +50,20 @@ tasks:
   release:major:
     desc: Create a major release
     deps:
-      - check
+      - sanity
     cmds:
       - ./scripts/release.sh major
 
   release:minor:
     desc: Create a minor release
     deps:
-      - check
+      - sanity
     cmds:
       - ./scripts/release.sh minor
 
   release:patch:
     desc: Create a patch release
     deps:
-      - check
+      - sanity
     cmds:
       - ./scripts/release.sh patch
