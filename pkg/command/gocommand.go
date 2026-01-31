@@ -48,7 +48,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/barnowlsnest/go-actorlib/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v1/pkg/actor"
 )
 
 // Command execution states define the lifecycle stages of command processing.

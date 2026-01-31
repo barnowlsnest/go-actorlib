@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v1/pkg/actor"
 )
 
 // MockActor implements both Runnable and Actionable interfaces for testing
