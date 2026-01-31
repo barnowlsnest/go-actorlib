@@ -56,7 +56,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/barnowlsnest/go-actorlib/v1/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v2/pkg/actor"
 )
 
 type (
