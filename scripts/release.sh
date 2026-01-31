@@ -131,8 +131,6 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     print_info "Pushing tag to origin..."
     git push origin "$new_version"
     print_success "Tag pushed to origin"
-
-    print_info "Tag is now available for Go module users:"
     print_info "go get github.com/barnowlsnest/go-actor-lib/v1@$new_version"
 else
     print_warning "Tag created locally but not pushed to origin"
