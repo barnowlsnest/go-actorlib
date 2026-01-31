@@ -1,4 +1,4 @@
-module github.com/barnowlsnest/go-actorlib/v1
+module github.com/barnowlsnest/go-actorlib/v2
 
 go 1.25
 
