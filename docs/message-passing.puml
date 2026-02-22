@@ -1,0 +1,76 @@
+@startuml message-passing
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Actor Model Message Passing Pattern
+
+participant "Sender Goroutine" as sender
+participant "Actor Input Channel" as channel
+participant "Actor Goroutine" as actor
+participant "Entity State" as entity
+participant "Result Channel" as result
+
+note over sender, result : Asynchronous Message Passing with Type Safety
+
+== Message Creation ==
+sender -> sender : cmd := command.New(delegateFn)
+activate sender
+
+== Message Sending ==
+sender -> channel : actor.Receive(ctx, cmd)
+note right : Non-blocking if buffer available\nBlocks if buffer full (backpressure)
+
+alt Buffer Available
+  channel --> sender : success
+  sender -> result : listen on cmd.Done()
+  deactivate sender
+else Buffer Full & Timeout
+  channel --> sender : ErrActorReceiveTimeout
+  deactivate sender
+end
+
+== Message Processing ==
+activate actor
+loop Message Processing Loop
+  actor -> channel : <-input
+  channel --> actor : command
+  
+  actor -> actor : validate state
+  
+  alt Actor Started
+    actor -> entity : cmd.Execute(ctx, entity)
+    activate entity
+    
+    alt Success
+      entity -> entity : modify state
+      entity --> result : send result
+      deactivate entity
+    else Error
+      entity --> result : close with error
+      deactivate entity
+    end
+    
+  else Actor Stopping
+    actor -> result : close channel
+    note right : Reject new messages
+  end
+end
+
+== Result Consumption ==
+activate sender
+sender -> result : <-cmd.Done()
+alt Success
+  result --> sender : result value
+else Error/Timeout
+  result --> sender : channel closed
+  sender -> sender : check cmd.Error()
+end
+deactivate sender
+
+note over actor, entity : "Isolated State Access\nOnly actor goroutine\naccesses entity state"
+
+note over channel : "Bounded Channel\nProvides backpressure\nand flow control"
+
+deactivate actor
+
+@enduml

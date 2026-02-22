@@ -1,0 +1,49 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  ALL_GO_FILES: ./...
+
+tasks:
+  go-tidy:
+    desc: Update all dependencies
+    cmds:
+      - go mod tidy
+
+  go-build:
+    desc: Build all packages
+    cmds:
+      - go build '{{.ALL_GO_FILES}}'
+
+  go-fmt:
+    desc: Format all Go files
+    cmds:
+      - go fmt '{{.ALL_GO_FILES}}'
+
+  go-vet:
+    desc: Run static analysis
+    cmds:
+      - go vet '{{.ALL_GO_FILES}}'
+
+  go-test:
+    desc: Run all tests
+    cmds:
+      - go test -cover '{{.ALL_GO_FILES}}'
+      - go test -bench=. '{{.ALL_GO_FILES}}'
+
+  go-lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run
+
+  sanity:
+    desc: Run all checks (fmt, build, test, vet)
+    deps:
+      - go-tidy
+      - go-fmt
+      - go-lint
+      - go-build
+      - go-vet
+      - go-test
+
