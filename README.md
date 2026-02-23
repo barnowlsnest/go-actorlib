@@ -12,6 +12,40 @@ A lightweight, type-safe actor library for Go implementing the Actor Model patte
 - **Panic Recovery**: Automatic panic recovery with configurable error handling
 - **Thread-Safe**: All operations are safe for concurrent use
 
+## Why Actor Model in Go?
+
+Go already provides goroutines, channels, and `sync.Mutex` — so why add an actor abstraction on top?
+
+### Pros
+
+- **No locks, no data races by design.** Each actor owns its state exclusively. There is no shared mutable state to protect, so entire classes of concurrency bugs (deadlocks, forgotten mutexes, lock ordering issues) are eliminated at the structural level rather than by developer discipline.
+- **Predictable sequential execution.** Commands sent to an actor are processed one at a time in order. Complex state mutations become simple single-threaded logic — no need to reason about interleaving.
+- **Clear ownership boundaries.** The actor is the single source of truth for its entity. This makes it easy to reason about who can read or write a piece of state, even in large codebases.
+- **Structured lifecycle.** Built-in start/stop/hooks give you a consistent way to manage resource setup and teardown across many concurrent components, avoiding leaked goroutines and orphaned resources.
+- **Natural backpressure.** Bounded input channels signal when a component is overloaded, letting the system push back rather than silently growing unbounded queues.
+- **Fault isolation.** A panic in one actor is recovered and contained — it doesn't bring down the entire application or corrupt unrelated state.
+
+### Cons
+
+- **Overhead for trivial concurrency.** If you just need a goroutine-safe counter or a simple fan-out, a `sync.Mutex` or a bare channel is lighter and more idiomatic.
+- **Latency from message passing.** Every interaction goes through a channel send and sequential processing. For hot paths that need sub-microsecond shared reads, a `sync.RWMutex` or `sync/atomic` will be faster.
+- **Debugging indirection.** Stack traces stop at channel operations. Tracing a request across multiple actors requires correlation IDs or structured logging — the call chain is no longer visible in a single stack.
+- **Learning curve.** Developers familiar with Go's stdlib concurrency need to shift from "protect shared state with a lock" to "send a message and wait for a result."
+
+### When to use
+
+- Long-lived stateful components (connection managers, session stores, caches, worker coordinators)
+- State that multiple goroutines need to read and mutate, where getting the locking right is error-prone
+- Systems where you need structured lifecycle management (graceful startup ordering, coordinated shutdown)
+- Domains that naturally decompose into independent entities (game objects, device controllers, per-user/per-tenant state)
+
+### When not to use
+
+- Simple request-scoped concurrency — a `sync.WaitGroup` or `errgroup` is sufficient
+- Read-heavy, write-rare shared state — `sync.RWMutex` or `atomic.Value` avoids unnecessary serialization
+- Fire-and-forget work — a plain goroutine with a channel is simpler
+- CPU-bound parallelism (data processing pipelines) — use worker pools and fan-out/fan-in instead
+
 ## Quick Start By Examples
 
 ### 1. Define Your Entity
