@@ -92,4 +92,16 @@ note bottom of GoActor : "Generic actor processing\nExecutable<T> commands on\ne
 
 note bottom of GoCommand : "Type-safe command wrapping\nDelegateFn<E,R> for async\nexecution with results"
 
+package "Ask Convenience" {
+  class "ask.New<E,R>" as AskNew {
+    +New(ctx, actor, fn, timeout) (R, error)
+  }
+}
+
+AskNew ..> GoActor : sends command via Receive
+AskNew ..> GoCommand : creates and awaits
+AskNew ..> DelegateFn : wraps into command
+
+note bottom of AskNew : "Convenience function:\nsingle-call request/response\nwith timeout"
+
 @enduml

@@ -24,17 +24,19 @@ Run a single test:
 ```bash
 go test -run TestName ./pkg/actor/
 go test -run TestName ./pkg/command/
+go test -run TestName ./pkg/ask/
 ```
 
 Tests use testify suites, so individual test methods are run as subtests:
 ```bash
 go test -run TestGoActorSuite/TestMethodName ./pkg/actor/
 go test -run TestGoCommandSuite/TestMethodName ./pkg/command/
+go test -run TestGoAskTestSuite/TestMethodName ./pkg/ask/
 ```
 
 ## Architecture
 
-Two packages under `pkg/`:
+Three packages under `pkg/`:
 
 ### `pkg/actor` — Core actor implementation
 - **`GoActor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
@@ -47,6 +49,10 @@ Two packages under `pkg/`:
 ### `pkg/command` — Command pattern for async operations
 - **`GoCommand[E Entity, R any]`** — Wraps a `DelegateFn[E, R]` (func(entity E) (R, error)) as an `Executable[E]`. Returns results via a buffered channel (`Done()`).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished/Failed/Canceled/Panic.
+
+### `pkg/ask` — Ask pattern (request/response convenience)
+- **`New[E Entity, R any]`** — Single-call request/response with timeout. Wraps command creation, `Receive`, and result waiting into one function. Returns `(R, error)`.
+- **`ErrAskTimeout`** — Returned when the result is not received within the specified timeout.
 
 ### Design patterns
 - **Actor Model**: Isolated actors with exclusive state access, async communication via `Executable` commands.

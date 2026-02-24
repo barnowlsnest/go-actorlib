@@ -73,4 +73,26 @@ note over channel : "Bounded Channel\nProvides backpressure\nand flow control"
 
 deactivate actor
 
+== Ask Pattern (Simplified Flow) ==
+
+participant "Caller" as caller
+
+activate caller
+caller -> caller : ask.New(ctx, actor, fn, timeout)
+caller -> channel : actor.Receive(ctx, cmd)
+channel --> caller : success
+
+alt Result Ready
+  result --> caller : (R, nil)
+else Delegate Error
+  result --> caller : (zero, error)
+else Context Cancelled
+  caller --> caller : (zero, ctx.Err())
+else Timeout
+  caller --> caller : (zero, ErrAskTimeout)
+end
+deactivate caller
+
+note over caller : "ask.New collapses command\ncreation, send, wait, and\nerror check into one call"
+
 @enduml

@@ -126,6 +126,39 @@ if err := cmd.Error(); err != nil {
 }
 ```
 
+### 5. Ask Pattern (Request/Response with Timeout)
+
+The `ask` package provides a convenience function that collapses the command creation, sending, waiting, and error checking into a single call:
+
+```go
+import "github.com/barnowlsnest/go-actorlib/v2/pkg/ask"
+
+// Before: 7+ lines of boilerplate
+cmd := command.New(func(counter *Counter) (int, error) {
+    counter.value++
+    return counter.value, nil
+})
+err := myActor.Receive(ctx, cmd)
+if err != nil { ... }
+select {
+case result := <-cmd.Done():
+    fmt.Println(result)
+case <-time.After(5 * time.Second):
+    fmt.Println("timeout")
+}
+if err := cmd.Error(); err != nil { ... }
+
+// After: single call
+result, err := ask.New(ctx, myActor, func(counter *Counter) (int, error) {
+    counter.value++
+    return counter.value, nil
+}, 5*time.Second)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Counter value: %d\n", result)
+```
+
 ## Architecture
 
 PlantUML diagrams documenting the architecture are available in [`docs/`](./docs/README.md).
