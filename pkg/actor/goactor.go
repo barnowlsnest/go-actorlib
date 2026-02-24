@@ -157,6 +157,9 @@ type (
 
 		hooks    Hooks
 		provider EntityProvider[T]
+
+		middleware []Middleware[T]
+		handler    HandlerFunc[T]
 	}
 
 	// GoActorOption defines a function type for configuring actors during creation.
@@ -350,6 +353,8 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 		return ErrActorNilEntity
 	}
 
+	ga.buildHandler()
+
 	func(e T) {
 		defer ga.catchPanic()
 		ga.hooks.BeforeStart(e)
@@ -388,7 +393,7 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 				default:
 					func() {
 						defer ga.catchPanic()
-						e.Execute(ctx, entity)
+						ga.handler(ctx, e, entity)
 					}()
 				}
 			}
