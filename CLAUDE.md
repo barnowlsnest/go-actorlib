@@ -29,8 +29,8 @@ go test -run TestName ./pkg/ask/
 
 Tests use testify suites, so individual test methods are run as subtests:
 ```bash
-go test -run TestGoActorSuite/TestMethodName ./pkg/actor/
-go test -run TestGoCommandSuite/TestMethodName ./pkg/command/
+go test -run TestGoActorTestSuite/TestMethodName ./pkg/actor/
+go test -run TestGoCommandTestSuite/TestMethodName ./pkg/command/
 go test -run TestGoAskTestSuite/TestMethodName ./pkg/ask/
 ```
 
@@ -80,4 +80,4 @@ Available in [`docs/`](./docs/README.md): architecture overview, component relat
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`.
 - Test naming convention: `TestX_Condition_ShouldY` (behavior-driven).
-- Linting: golangci-lint with 25 linters enabled. Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec.
+- Linting: golangci-lint with 21 linters enabled. Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
