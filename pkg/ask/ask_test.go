@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
+
 	"github.com/barnowlsnest/go-actorlib/v2/pkg/actor"
 	"github.com/barnowlsnest/go-actorlib/v2/pkg/command"
 )
@@ -62,6 +64,7 @@ type GoAskTestSuite struct {
 	cancel context.CancelFunc
 	entity *TestEntity
 	actor  *actor.GoActor[*TestEntity]
+	ref    *actorref.Ref[*TestEntity]
 }
 
 func (s *GoAskTestSuite) SetupTest() {
@@ -80,6 +83,9 @@ func (s *GoAskTestSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	err = s.actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.Require().NoError(err)
+
+	s.ref, err = actorref.New(s.actor)
 	s.Require().NoError(err)
 }
 
@@ -103,7 +109,7 @@ func (s *GoAskTestSuite) TestNew_SuccessfulExecution_ShouldReturnResult() {
 	}
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, time.Second)
+	result, err := New(s.ctx, s.ref, fn, time.Second)
 
 	// Assert
 	s.NoError(err)
@@ -118,7 +124,7 @@ func (s *GoAskTestSuite) TestNew_DelegateFunctionError_ShouldReturnError() {
 	}
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, time.Second)
+	result, err := New(s.ctx, s.ref, fn, time.Second)
 
 	// Assert
 	s.Error(err)
@@ -133,7 +139,7 @@ func (s *GoAskTestSuite) TestNew_DelegateFunctionPanic_ShouldReturnPanicError() 
 	}
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, time.Second)
+	result, err := New(s.ctx, s.ref, fn, time.Second)
 
 	// Assert
 	s.Error(err)
@@ -151,7 +157,7 @@ func (s *GoAskTestSuite) TestNew_OnStoppedActor_ShouldReturnReceiveError() {
 	}
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, time.Second)
+	result, err := New(s.ctx, s.ref, fn, time.Second)
 
 	// Assert
 	s.Error(err)
@@ -173,7 +179,7 @@ func (s *GoAskTestSuite) TestNew_ContextCancelledDuringWait_ShouldReturnContextE
 	}()
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, 5*time.Second)
+	result, err := New(s.ctx, s.ref, fn, 5*time.Second)
 
 	// Assert
 	s.Error(err)
@@ -189,7 +195,7 @@ func (s *GoAskTestSuite) TestNew_SlowCommand_ShouldReturnTimeoutError() {
 	}
 
 	// Act
-	result, err := New(s.ctx, s.actor, fn, 50*time.Millisecond)
+	result, err := New(s.ctx, s.ref, fn, 50*time.Millisecond)
 
 	// Assert
 	s.Error(err)
@@ -206,14 +212,12 @@ func (s *GoAskTestSuite) TestNew_ConcurrentAsks_ShouldBeSafe() {
 
 	// Act
 	for i := range goroutines {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
+		wg.Go(func() {
 			fn := func(entity *TestEntity) (string, error) {
-				return fmt.Sprintf("result-%d", idx), nil
+				return fmt.Sprintf("result-%d", i), nil
 			}
-			results[idx], errs[idx] = New(s.ctx, s.actor, fn, time.Second)
-		}(i)
+			results[i], errs[i] = New(s.ctx, s.ref, fn, time.Second)
+		})
 	}
 	wg.Wait()
 
@@ -245,13 +249,18 @@ func BenchmarkNew_Success(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	ref, err := actorref.New(a)
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	fn := func(entity *TestEntity) (string, error) {
 		return entity.GetValue(), nil
 	}
 
 	b.ResetTimer()
 	for b.Loop() {
-		_, err := New(ctx, a, fn, time.Second)
+		_, err := New(ctx, ref, fn, time.Second)
 		if err != nil {
 			b.Fatal(err)
 		}
