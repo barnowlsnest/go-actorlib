@@ -7,6 +7,7 @@ A lightweight, type-safe actor library for Go implementing the Actor Model patte
 - **Type-Safe**: Generic interfaces ensure compile-time type safety for entities and commands
 - **Lightweight**: Minimal overhead using Go's native concurrency primitives
 - **Lifecycle Management**: Complete actor lifecycle with hooks for monitoring and supervision
+- **ActorRef**: Immutable, lightweight proxy that decouples senders from the concrete actor type
 - **Command Pattern**: Built-in command implementation with result channels and error handling
 - **Context Support**: Full context.Context integration for cancellation and timeouts
 - **Panic Recovery**: Automatic panic recovery with configurable error handling
@@ -52,7 +53,7 @@ Go already provides goroutines, channels, and `sync.Mutex` — so why add an act
 
 ```go
 type Counter struct {
-    value int
+    Value int
 }
 
 func (c *Counter) IsProvidable() bool {
@@ -97,61 +98,60 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 }
 ```
 
-### 4. Send Commands
+### 4. Create an ActorRef and Hand It Out
+
+`ActorRef` decouples the **lifecycle owner** (who creates and starts the actor) from **senders** (who only need to send messages). The ref exposes only `Send`, `Stop`, and `State` — callers cannot call `Start`, `WaitReady`, or access internals.
 
 ```go
-// Create a command that increments the counter
-cmd := command.New(func(counter *Counter) (int, error) {
-    counter.value++
-    return counter.value, nil
-})
+import "github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
 
-// Send command to actor
-err := actor.Receive(ctx, cmd)
+// Lifecycle owner creates the actor and keeps the *GoActor pointer private
+ref, err := actorref.New(myActor)
 if err != nil {
     log.Fatal(err)
 }
 
-// Wait for result
-select {
-case result := <-cmd.Done():
-    fmt.Printf("Counter value: %d\n", result)
-case <-time.After(5 * time.Second):
-    fmt.Println("Command timeout")
-}
+// Pass ref to other components — they can send messages but cannot
+// start, restart, or access lifecycle internals
+svc := NewOrderService(ref)
+```
 
-// Check for errors
-if err := cmd.Error(); err != nil {
-    log.Printf("Command failed: %v", err)
+### 5. Send Commands via Ref
+
+Callers receive an `*actorref.Ref[T]` and interact with the actor through it:
+
+```go
+// Inside OrderService — only holds a ref, not the actor itself
+func (s *OrderService) PlaceOrder(ctx context.Context) error {
+    cmd := command.New(func(counter *Counter) (int, error) {
+        counter.Value++
+        return counter.Value, nil
+    })
+
+    // Send via ref — cannot call Start/WaitReady/CheckState
+    if err := s.ref.Send(ctx, cmd); err != nil {
+        return err
+    }
+
+    result, ok := <-cmd.Done()
+    if !ok {
+        return cmd.Error()
+    }
+    fmt.Printf("Counter value: %d\n", result)
+    return cmd.Error()
 }
 ```
 
-### 5. Ask Pattern (Request/Response with Timeout)
+### 6. Ask Pattern (Request/Response with Timeout)
 
-The `ask` package provides a convenience function that collapses the command creation, sending, waiting, and error checking into a single call:
+The `ask` package collapses command creation, sending, waiting, and error checking into a single call. It accepts an `*actorref.Ref[E]`:
 
 ```go
 import "github.com/barnowlsnest/go-actorlib/v2/pkg/ask"
 
-// Before: 7+ lines of boilerplate
-cmd := command.New(func(counter *Counter) (int, error) {
-    counter.value++
-    return counter.value, nil
-})
-err := myActor.Receive(ctx, cmd)
-if err != nil { ... }
-select {
-case result := <-cmd.Done():
-    fmt.Println(result)
-case <-time.After(5 * time.Second):
-    fmt.Println("timeout")
-}
-if err := cmd.Error(); err != nil { ... }
-
-// After: single call
-result, err := ask.New(ctx, myActor, func(counter *Counter) (int, error) {
-    counter.value++
-    return counter.value, nil
+result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
+    counter.Value++
+    return counter.Value, nil
 }, 5*time.Second)
 if err != nil {
     log.Fatal(err)
@@ -178,16 +178,18 @@ This project uses [Task](https://taskfile.dev/) for build automation:
 go install github.com/go-task/task/v3/cmd/task@latest
 
 # Essential commands
-task go:build     # Build all packages
-task go:test      # Run tests with coverage and benchmarks  
-task go:fmt       # Format all Go files
-task go:vet       # Run static analysis
-task check        # Run complete check suite
+task sanity       # Run all checks (tidy, fmt, lint, build, vet, test)
+task go-build     # Build all packages
+task go-test      # Run tests with coverage and benchmarks
+task go-lint      # Run golangci-lint
+task go-fmt       # Format all Go files
+task go-vet       # Run static analysis
+task go-tidy      # go mod tidy
 ```
 
 ## Requirements
 
-- Go 1.24.5 or later
+- Go 1.25 or later
 - Dependencies managed with Go modules
 
 ## License

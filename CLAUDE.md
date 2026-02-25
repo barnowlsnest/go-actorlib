@@ -23,6 +23,7 @@ task go-tidy         # go mod tidy
 Run a single test:
 ```bash
 go test -run TestName ./pkg/actor/
+go test -run TestName ./pkg/actorref/
 go test -run TestName ./pkg/command/
 go test -run TestName ./pkg/ask/
 ```
@@ -30,13 +31,14 @@ go test -run TestName ./pkg/ask/
 Tests use testify suites, so individual test methods are run as subtests:
 ```bash
 go test -run TestGoActorTestSuite/TestMethodName ./pkg/actor/
+go test -run TestActorRefTestSuite/TestMethodName ./pkg/actorref/
 go test -run TestGoCommandTestSuite/TestMethodName ./pkg/command/
 go test -run TestGoAskTestSuite/TestMethodName ./pkg/ask/
 ```
 
 ## Architecture
 
-Three packages under `pkg/`:
+Four packages under `pkg/`:
 
 ### `pkg/actor` — Core actor implementation
 - **`GoActor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
@@ -46,12 +48,18 @@ Three packages under `pkg/`:
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done/StoppedWithError/Canceled/Panicked.
 - Configured via functional options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`.
 
+### `pkg/actorref` — Typed actor handle (proxy)
+- **`Ref[T Entity]`** — Immutable, lightweight proxy struct for interacting with a `GoActor[T]`. Exposes only `Send`, `Stop`, and `State` — hides lifecycle methods (`Start`, `WaitReady`, `CheckState`).
+- **`New[T Entity](a *GoActor[T]) (*Ref[T], error)`** — Constructor; validates non-nil actor.
+- **`ErrActorRefNilActor`** — Returned when constructing a ref from a nil actor.
+- Safe for concurrent use; multiple refs can point to the same actor.
+
 ### `pkg/command` — Command pattern for async operations
 - **`GoCommand[E Entity, R any]`** — Wraps a `DelegateFn[E, R]` (func(entity E) (R, error)) as an `Executable[E]`. Returns results via a buffered channel (`Done()`).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished/Failed/Canceled/Panic.
 
 ### `pkg/ask` — Ask pattern (request/response convenience)
-- **`New[E Entity, R any]`** — Single-call request/response with timeout. Wraps command creation, `Receive`, and result waiting into one function. Returns `(R, error)`.
+- **`New[E Entity, R any]`** — Single-call request/response with timeout. Accepts `*actorref.Ref[E]` (not `*GoActor[E]`). Wraps command creation, `Send`, and result waiting into one function. Returns `(R, error)`.
 - **`ErrAskTimeout`** — Returned when the result is not received within the specified timeout.
 
 ### Design patterns
@@ -70,9 +78,10 @@ Available in [`docs/`](./docs/README.md): architecture overview, component relat
 1. Define entity implementing `Entity`, create a provider implementing `EntityProvider[T]`.
 2. Create actor: `actor.New(WithProvider(provider), options...)`.
 3. Start: `actor.Start(ctx)`, then `actor.WaitReady(ctx, timeout)`.
-4. Send commands: `actor.Receive(ctx, command.New(delegateFn))`.
-5. Get results: `<-cmd.Done()`, check `cmd.Error()`.
-6. Shutdown: `actor.Stop(timeout)`.
+4. Obtain a ref: `ref, err := actorref.New(myActor)`.
+5. Send commands: `ref.Send(ctx, command.New(delegateFn))`.
+6. Get results: `<-cmd.Done()`, check `cmd.Error()`.
+7. Shutdown: `ref.Stop(timeout)`.
 
 ## Code Conventions
 
