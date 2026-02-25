@@ -6,7 +6,7 @@
 //
 // Example usage:
 //
-//	result, err := ask.New(ctx, myActor, func(entity *MyEntity) (int, error) {
+//	result, err := ask.New(ctx, myActorRef, func(entity *MyEntity) (int, error) {
 //	    entity.value++
 //	    return entity.value, nil
 //	}, 5*time.Second)
@@ -21,13 +21,14 @@ import (
 	"time"
 
 	"github.com/barnowlsnest/go-actorlib/v2/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
 	"github.com/barnowlsnest/go-actorlib/v2/pkg/command"
 )
 
 // New sends a command to the actor and waits for the result with a timeout.
 //
 // It creates a [command.GoCommand] from the provided delegate function, sends it
-// to the actor via [actor.GoActor.Receive], and waits for the result. The call
+// to the actor via [actorref.Ref.Send], and waits for the result. The call
 // returns when one of the following happens:
 //   - The command completes (successfully or with an error)
 //   - The context is canceled
@@ -35,20 +36,20 @@ import (
 //
 // Returns the command result and nil on success, or the zero value of R and an error
 // on failure. Possible errors include:
-//   - Actor errors from [actor.GoActor.Receive] (e.g., actor stopped, receive timeout)
+//   - Actor errors from [actorref.Ref.Send] (e.g., actor stopped, receive timeout)
 //   - Delegate function errors propagated via [command.GoCommand.Error]
 //   - [context.Canceled] or [context.DeadlineExceeded] if ctx is done
 //   - [ErrAskTimeout] if the timeout expires before a result is available
 func New[E actor.Entity, R any](
 	ctx context.Context,
-	a *actor.GoActor[E],
+	ref *actorref.Ref[E],
 	fn command.DelegateFn[E, R],
 	timeout time.Duration,
 ) (R, error) {
 	var zero R
 	cmd := command.New(fn)
 
-	if err := a.Receive(ctx, cmd); err != nil {
+	if err := ref.Send(ctx, cmd); err != nil {
 		return zero, err
 	}
 
