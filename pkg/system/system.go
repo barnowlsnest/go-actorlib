@@ -199,7 +199,7 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	for i := len(s.order) - 1; i >= 0; i-- {
 		name := s.order[i]
 		if name == "" {
-			continue // tombstoned by Unregister
+			continue
 		}
 
 		if e, exists := s.actors[name]; exists {
@@ -211,8 +211,7 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	s.order = nil
 
 	s.mu.Unlock()
-
-	// Stop actors outside the lock.
+	
 	var errs []error
 
 	for _, managed := range snapshot {
