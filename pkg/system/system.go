@@ -102,20 +102,27 @@ func (s *ActorSystem) register(name string, managed ManagedActor, dispatch dispa
 }
 
 // send is the unexported method that looks up an actor and invokes its dispatch closure.
+// The lock is released before invoking dispatch so that writers (StopAll, Unregister)
+// are not blocked for the duration of the actor send, and actor callbacks that
+// re-enter the system cannot deadlock.
 func (s *ActorSystem) send(ctx context.Context, name string, cmd any) error {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	if s.stopped {
+		s.mu.RUnlock()
 		return ErrSystemStopped
 	}
 
 	e, exists := s.actors[name]
 	if !exists {
+		s.mu.RUnlock()
 		return ErrActorNotFound
 	}
 
-	return e.dispatch(ctx, cmd)
+	fn := e.dispatch
+	s.mu.RUnlock()
+
+	return fn(ctx, cmd)
 }
 
 // Get returns the ManagedActor registered under the given name.
@@ -172,38 +179,47 @@ func (s *ActorSystem) Unregister(name string) error {
 //
 // After StopAll, no further operations are allowed on the system.
 // Calling StopAll on an already-stopped system returns ErrSystemStopped.
+//
+// The lock is released before stopping actors so that concurrent callers
+// of Get, Send, and Register observe ErrSystemStopped immediately rather
+// than blocking until every actor has finished shutting down.
 func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if s.stopped {
+		s.mu.Unlock()
 		return ErrSystemStopped
 	}
 
 	s.stopped = true
 
-	var errs []error
+	// Snapshot the stop list and clear internal state while holding the lock.
+	snapshot := make([]ManagedActor, 0, len(s.actors))
 
-	// Stop in reverse registration order.
 	for i := len(s.order) - 1; i >= 0; i-- {
 		name := s.order[i]
 		if name == "" {
 			continue // tombstoned by Unregister
 		}
 
-		e, exists := s.actors[name]
-		if !exists {
-			continue
-		}
-
-		if err := e.managed.Stop(timeout); err != nil {
-			errs = append(errs, err)
+		if e, exists := s.actors[name]; exists {
+			snapshot = append(snapshot, e.managed)
 		}
 	}
 
-	// Clear state.
 	s.actors = make(map[string]entry)
 	s.order = nil
+
+	s.mu.Unlock()
+
+	// Stop actors outside the lock.
+	var errs []error
+
+	for _, managed := range snapshot {
+		if err := managed.Stop(timeout); err != nil {
+			errs = append(errs, err)
+		}
+	}
 
 	return errors.Join(errs...)
 }
