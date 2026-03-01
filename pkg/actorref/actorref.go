@@ -41,3 +41,8 @@ func (r *Ref[T]) Stop(timeout time.Duration) error {
 func (r *Ref[T]) State() uint64 {
 	return r.actor.State()
 }
+
+// Done returns a channel that is closed when the actor terminates.
+func (r *Ref[T]) Done() <-chan struct{} {
+	return r.actor.Done()
+}

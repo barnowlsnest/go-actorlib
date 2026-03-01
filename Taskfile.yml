@@ -29,13 +29,13 @@ tasks:
   go-test:
     desc: Run all tests
     cmds:
-      - go test -cover '{{.ALL_GO_FILES}}'
-      - go test -bench=. '{{.ALL_GO_FILES}}'
+      - go test -race -cover '{{.ALL_GO_FILES}}'
+      - go test -race -bench=. '{{.ALL_GO_FILES}}'
 
   go-lint:
     desc: Run golangci-lint
     cmds:
-      - golangci-lint run
+      - golangci-lint run --fix
 
   sanity:
     desc: Run all checks (fmt, build, test, vet)

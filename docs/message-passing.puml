@@ -5,42 +5,58 @@ skinparam backgroundColor #FFFFFF
 title Actor Model Message Passing Pattern
 
 participant "Sender Goroutine" as sender
-participant "Actor Input Channel" as channel
+participant "Ref<T>" as ref
+participant "Input Channel" as channel
+participant "Stop Channel" as stopchan
 participant "Actor Goroutine" as actor
+participant "Middleware Chain" as middleware
+participant "BehaviorStack" as behavior
 participant "Entity State" as entity
 participant "Result Channel" as result
 
-note over sender, result : Asynchronous Message Passing with Type Safety
+note over sender, result : Asynchronous Message Passing via Ref (Typed Actor Handle)
 
 == Message Creation ==
 sender -> sender : cmd := command.New(delegateFn)
 activate sender
 
-== Message Sending ==
-sender -> channel : actor.Receive(ctx, cmd)
+== Message Sending (via Ref) ==
+sender -> ref : ref.Send(ctx, cmd)
+activate ref
+ref -> channel : actor.Receive(ctx, cmd)
 note right : Non-blocking if buffer available\nBlocks if buffer full (backpressure)
 
 alt Buffer Available
-  channel --> sender : success
+  channel --> ref : success
+  ref --> sender : nil
+  deactivate ref
   sender -> result : listen on cmd.Done()
   deactivate sender
 else Buffer Full & Timeout
-  channel --> sender : ErrActorReceiveTimeout
+  channel --> ref : ErrActorReceiveTimeout
+  ref --> sender : error
+  deactivate ref
+  deactivate sender
+else Stop Channel Closed
+  stopchan --> ref : actor stopping
+  ref --> sender : ErrActorReceiveTimeout
+  deactivate ref
   deactivate sender
 end
 
-== Message Processing ==
+== Message Processing (Actor Goroutine) ==
 activate actor
-loop Message Processing Loop
-  actor -> channel : <-input
-  channel --> actor : command
-  
-  actor -> actor : validate state
-  
-  alt Actor Started
-    actor -> entity : cmd.Execute(ctx, entity)
+loop Processing Loop
+  actor -> actor : select {\n  case msg := <-input:\n  case <-stop: exit\n}
+
+  alt Message Received
+    actor -> middleware : chain(ctx, msg, entity)
+    activate middleware
+    middleware -> behavior : Current()(ctx, msg, entity)
+    activate behavior
+    behavior -> entity : execute on entity
     activate entity
-    
+
     alt Success
       entity -> entity : modify state
       entity --> result : send result
@@ -48,13 +64,20 @@ loop Message Processing Loop
     else Error
       entity --> result : close with error
       deactivate entity
+    else Panic
+      middleware -> middleware : Recovery catches panic
+      note right : Prevents Panicked state\nif Recovery middleware active
     end
-    
-  else Actor Stopping
-    actor -> result : close channel
-    note right : Reject new messages
+
+    deactivate behavior
+    deactivate middleware
+
+  else Stop Signal
+    actor -> actor : transition to Done
+    note right : close(done channel)
   end
 end
+deactivate actor
 
 == Result Consumption ==
 activate sender
@@ -67,20 +90,38 @@ else Error/Timeout
 end
 deactivate sender
 
-note over actor, entity : "Isolated State Access\nOnly actor goroutine\naccesses entity state"
+note over actor, entity
+  **Isolated State Access**
+  Only actor goroutine accesses entity state.
+  Middleware and behavior handlers run
+  within the actor's goroutine.
+end note
 
-note over channel : "Bounded Channel\nProvides backpressure\nand flow control"
+note over channel
+  **Bounded Channel**
+  Provides backpressure
+  and flow control.
+  Size: WithInputBufferSize()
+end note
 
-deactivate actor
+note over stopchan
+  **Stop Channel**
+  Closed by Stop() via
+  atomic CAS. Signals
+  both processing loop
+  and Receive helpers.
+end note
 
-== Ask Pattern (Simplified Flow) ==
+== Ask Pattern (Simplified via Ref) ==
 
 participant "Caller" as caller
 
 activate caller
-caller -> caller : ask.New(ctx, actor, fn, timeout)
-caller -> channel : actor.Receive(ctx, cmd)
-channel --> caller : success
+caller -> caller : ask.New(ctx, ref, fn, timeout)
+caller -> ref : ref.Send(ctx, cmd)
+ref -> channel : actor.Receive(ctx, cmd)
+channel --> ref : success
+ref --> caller : nil
 
 alt Result Ready
   result --> caller : (R, nil)
@@ -93,6 +134,6 @@ else Timeout
 end
 deactivate caller
 
-note over caller : "ask.New collapses command\ncreation, send, wait, and\nerror check into one call"
+note over caller : "ask.New wraps command\ncreation, ref.Send, wait,\nand error check into one call"
 
 @enduml

@@ -146,6 +146,7 @@ type (
 	//   - Isolated state (entity is only accessible within the actor's goroutine)
 	//   - Asynchronous communication through message passing
 	//   - Supervision and error handling through hooks
+	//   - Dynamic behavior change via Become/Unbecome
 	GoActor[T Entity] struct {
 		receiveTimeout time.Duration
 		inputBufSize   int
@@ -154,12 +155,16 @@ type (
 		input chan Executable[T]
 		done  chan struct{}
 		ready chan struct{}
+		stop  chan struct{}
 
 		hooks    Hooks
 		provider EntityProvider[T]
+		name     string
 
 		middleware []Middleware[T]
 		handler    HandlerFunc[T]
+		behavior   *BehaviorStack[T]
+		actorCtx   *GoActorContext[T]
 	}
 
 	// GoActorOption defines a function type for configuring actors during creation.
@@ -199,6 +204,7 @@ func New[T Entity](opts ...GoActorOption[T]) (*GoActor[T], error) {
 	actor.input = make(chan Executable[T], actor.inputBufSize)
 	actor.done = make(chan struct{})
 	actor.ready = make(chan struct{})
+	actor.stop = make(chan struct{})
 	actor.state = Initialized
 
 	return actor, nil
@@ -262,6 +268,8 @@ func (ga *GoActor[T]) processExecutable(ctx context.Context, e Executable[T]) er
 	select {
 	case ga.input <- e:
 		return nil
+	case <-ga.stop:
+		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -273,6 +281,8 @@ func (ga *GoActor[T]) processExecutableWithTimeout(ctx context.Context, e Execut
 	select {
 	case ga.input <- e:
 		return nil
+	case <-ga.stop:
+		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
@@ -340,6 +350,10 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 //
 // Returns an error if the entity is nil, not providable, or if startup fails.
 func (ga *GoActor[T]) Start(ctx context.Context) error {
+	if err := ga.CheckState(Initialized); err != nil {
+		return err
+	}
+
 	entity := ga.provider.Provide()
 
 	// Check if the entity is nil using reflection
@@ -354,6 +368,11 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 	}
 
 	ga.buildHandler()
+	ga.behavior = newBehaviorStack(ga.handler)
+	ga.actorCtx = &GoActorContext[T]{
+		behavior: ga.behavior,
+		name:     ga.name,
+	}
 
 	func(e T) {
 		defer ga.catchPanic()
@@ -362,6 +381,9 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 
 	go func(ctx context.Context, entity T) {
 		defer close(ga.done)
+
+		// Enrich context with actor context for handlers and middleware
+		actorScopedCtx := WithGoActorContext(ctx, ga.actorCtx)
 
 		atomic.StoreUint64(&ga.state, Started)
 		close(ga.ready) // Signal that the actor is ready to receive messages
@@ -376,24 +398,27 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				ga.handleCtxErr(ctx.Err())
 				return
-			case e, ok := <-ga.input:
-				if !ok {
-					func(e T) {
-						defer ga.catchPanic()
-						ga.hooks.BeforeStop(e)
-					}(entity)
-
-					return
-				}
-
+			case <-ga.stop:
+				func(e T) {
+					defer ga.catchPanic()
+					ga.hooks.BeforeStop(e)
+				}(entity)
+				return
+			case e := <-ga.input:
 				select {
 				case <-ctx.Done():
 					ga.handleCtxErr(ctx.Err())
 					return
+				case <-ga.stop:
+					func(e T) {
+						defer ga.catchPanic()
+						ga.hooks.BeforeStop(e)
+					}(entity)
+					return
 				default:
 					func() {
 						defer ga.catchPanic()
-						ga.handler(ctx, e, entity)
+						ga.behavior.Current()(actorScopedCtx, e, entity)
 					}()
 				}
 			}
@@ -417,7 +442,7 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 		return fmt.Errorf("actor state mismatch: expected %d, got %d", Started, atomic.LoadUint64(&ga.state))
 	}
 
-	close(ga.input)
+	close(ga.stop)
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -478,6 +503,26 @@ func WithProvider[T Entity](provider EntityProvider[T]) GoActorOption[T] {
 		actor.provider = provider
 		return actor
 	}
+}
+
+// WithName configures the actor's name.
+// The name is available via GoActorContext.Name() during message processing.
+func WithName[T Entity](name string) GoActorOption[T] {
+	return func(actor *GoActor[T]) *GoActor[T] {
+		actor.name = name
+		return actor
+	}
+}
+
+// Name returns the actor's name.
+func (ga *GoActor[T]) Name() string {
+	return ga.name
+}
+
+// Done returns a channel that is closed when the actor's goroutine exits.
+// This can be used to wait for the actor to fully terminate.
+func (ga *GoActor[T]) Done() <-chan struct{} {
+	return ga.done
 }
 
 // WithHooks configures lifecycle event handlers for the actor.

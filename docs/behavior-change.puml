@@ -1,0 +1,117 @@
+@startuml behavior-change
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Behavior Change: Become / Unbecome Pattern
+
+participant "Sender" as sender
+participant "Ref<T>" as ref
+participant "Actor Goroutine" as actor
+participant "BehaviorStack" as stack
+participant "GoActorContext" as actx
+
+== Initial State ==
+
+note over stack
+  **Stack: [initialHandler]**
+  Depth: 1
+  Current: initialHandler
+end note
+
+== Message 1: Normal Processing ==
+sender -> ref : Send(ctx, msg1)
+ref -> actor : Receive(ctx, msg1)
+actor -> stack : Current()
+stack --> actor : initialHandler
+actor -> actor : initialHandler(ctx, msg1, entity)
+
+== Message 2: Trigger Become ==
+sender -> ref : Send(ctx, msg2)
+ref -> actor : Receive(ctx, msg2)
+actor -> stack : Current()
+stack --> actor : initialHandler
+actor -> actor : initialHandler(ctx, msg2, entity)
+
+note right of actor : Inside handler, actor retrieves\nGoActorContext from context.Context
+
+actor -> actx : GetGoActorContext[T](ctx)
+actx --> actor : actorContext
+actor -> actx : Become(authHandler)
+actx -> stack : Become(authHandler)
+
+note over stack
+  **Stack: [initialHandler, authHandler]**
+  Depth: 2
+  Current: authHandler
+end note
+
+== Message 3: New Behavior Active ==
+sender -> ref : Send(ctx, msg3)
+ref -> actor : Receive(ctx, msg3)
+actor -> stack : Current()
+stack --> actor : **authHandler**
+actor -> actor : authHandler(ctx, msg3, entity)
+
+note right of actor : Now processing with\nauthHandler behavior
+
+== Message 4: BecomeReplace ==
+sender -> ref : Send(ctx, msg4)
+ref -> actor : Receive(ctx, msg4)
+actor -> stack : Current()
+stack --> actor : authHandler
+actor -> actor : authHandler(ctx, msg4, entity)
+actor -> actx : BecomeReplace(adminHandler)
+actx -> stack : BecomeReplace(adminHandler)
+
+note over stack
+  **Stack: [initialHandler, adminHandler]**
+  Depth: 2 (unchanged)
+  Current: adminHandler
+  (authHandler discarded)
+end note
+
+== Message 5: Unbecome (Restore Previous) ==
+sender -> ref : Send(ctx, msg5)
+ref -> actor : Receive(ctx, msg5)
+actor -> stack : Current()
+stack --> actor : adminHandler
+actor -> actor : adminHandler(ctx, msg5, entity)
+actor -> actx : Unbecome()
+actx -> stack : Unbecome()
+stack --> actx : true (success)
+
+note over stack
+  **Stack: [initialHandler]**
+  Depth: 1
+  Current: initialHandler
+  (back to original behavior)
+end note
+
+== Message 6: Back to Original ==
+sender -> ref : Send(ctx, msg6)
+ref -> actor : Receive(ctx, msg6)
+actor -> stack : Current()
+stack --> actor : **initialHandler**
+actor -> actor : initialHandler(ctx, msg6, entity)
+
+== Unbecome at Base (No-Op) ==
+actor -> actx : Unbecome()
+actx -> stack : Unbecome()
+stack --> actx : false (cannot pop base handler)
+
+note over stack
+  **Stack: [initialHandler]**
+  Base handler is never removed.
+  Unbecome returns false.
+end note
+
+note over actor, stack
+  **Key Properties:**
+  • BehaviorStack is only accessed from within the actor's goroutine (no sync needed)
+  • GoActorContext is injected via context.WithValue at Start()
+  • Become pushes (preserves previous), BecomeReplace swaps top (discards previous)
+  • Unbecome pops to restore previous; returns false at base
+  • Middleware wraps the current behavior — chain is applied once at startup
+end note
+
+@enduml
