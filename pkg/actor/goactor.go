@@ -413,12 +413,11 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 //
 // Returns an error if the actor is not in the correct state for stopping.
 func (ga *GoActor[T]) Stop(timeout time.Duration) error {
-	if err := ga.CheckState(Started); err != nil {
-		return err
+	if !atomic.CompareAndSwapUint64(&ga.state, Started, Stopping) {
+		return fmt.Errorf("actor state mismatch: expected %d, got %d", Started, atomic.LoadUint64(&ga.state))
 	}
 
 	close(ga.input)
-	atomic.StoreUint64(&ga.state, Stopping)
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()

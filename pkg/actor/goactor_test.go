@@ -434,9 +434,9 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
 	s.NoError(err)
 
-	executed := false
+	var executed atomic.Bool
 	command := NewTestCommand("test-cmd", func(ctx context.Context, entity *TestEntity) {
-		executed = true
+		executed.Store(true)
 		entity.SetValue("updated-by-command")
 	})
 
@@ -448,7 +448,7 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 
 	// Assert
 	s.NoError(err)
-	s.True(executed)
+	s.True(executed.Load())
 	s.True(command.IsExecuted())
 
 	callLog := s.entity.GetCallLog()
@@ -737,6 +737,46 @@ func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 
 	// Assert
 	s.Greater(atomic.LoadInt64(&executionCount), int64(0))
+}
+
+func (s *GoActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
+	// Arrange
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
+
+	err = actor.Start(s.ctx)
+	s.NoError(err)
+
+	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
+	s.NoError(err)
+
+	// Act - Call Stop concurrently from multiple goroutines
+	const goroutines = 10
+	var wg sync.WaitGroup
+	errs := make([]error, goroutines)
+
+	for i := range goroutines {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			errs[idx] = actor.Stop(100 * time.Millisecond)
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Assert - Exactly one goroutine should succeed, rest should get state mismatch errors
+	successCount := 0
+	for _, stopErr := range errs {
+		if stopErr == nil {
+			successCount++
+		}
+	}
+	s.Equal(1, successCount, "exactly one concurrent Stop call should succeed")
+
+	// Actor should be in a terminal state
+	state := actor.State()
+	s.True(state == Done || state == Panicked)
 }
 
 // Benchmark tests
