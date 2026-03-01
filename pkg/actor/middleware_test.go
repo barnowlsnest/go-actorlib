@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -108,10 +109,10 @@ func (s *MiddlewareTestSuite) TestChain_Multiple_ShouldExecuteInOrder() {
 
 func (s *MiddlewareTestSuite) TestWithMiddleware_Single_ShouldConfigure() {
 	// Arrange
-	var called bool
+	var called atomic.Bool
 	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
 		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
-			called = true
+			called.Store(true)
 			next(ctx, e, entity)
 		}
 	}
@@ -134,7 +135,7 @@ func (s *MiddlewareTestSuite) TestWithMiddleware_Single_ShouldConfigure() {
 	s.NoError(actor.Receive(s.ctx, cmd))
 
 	time.Sleep(20 * time.Millisecond)
-	s.True(called)
+	s.True(called.Load())
 }
 
 func (s *MiddlewareTestSuite) TestWithMiddleware_MultipleCalls_ShouldAppend() {
