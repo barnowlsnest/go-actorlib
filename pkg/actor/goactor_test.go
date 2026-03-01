@@ -434,9 +434,9 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 	err = actor.WaitReady(s.ctx, 100*time.Millisecond)
 	s.NoError(err)
 
-	executed := false
+	var executed atomic.Bool
 	command := NewTestCommand("test-cmd", func(ctx context.Context, entity *TestEntity) {
-		executed = true
+		executed.Store(true)
 		entity.SetValue("updated-by-command")
 	})
 
@@ -448,7 +448,7 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 
 	// Assert
 	s.NoError(err)
-	s.True(executed)
+	s.True(executed.Load())
 	s.True(command.IsExecuted())
 
 	callLog := s.entity.GetCallLog()
