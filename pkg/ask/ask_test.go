@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/actorref"
 
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/command"
 )
 
 // TestEntity is a mock entity for testing purposes

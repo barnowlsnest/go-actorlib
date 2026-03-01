@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-go-actorlib is a lightweight, type-safe Actor Model library for Go built on native concurrency primitives (goroutines and channels). Module: `github.com/barnowlsnest/go-actorlib/v2`, requires Go 1.25.
+go-actorlib is a lightweight, type-safe Actor Model library for Go built on native concurrency primitives (goroutines and channels). Module: `github.com/barnowlsnest/go-actorlib/v3`, requires Go 1.25.
 
 ## Commands
 
