@@ -776,7 +776,7 @@ func (s *GoActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
 
 	// Actor should be in a terminal state
 	state := actor.State()
-	s.True(state >= Done && state <= Panicked)
+	s.True(state == Done || state == Panicked)
 }
 
 // Benchmark tests
