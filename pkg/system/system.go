@@ -52,10 +52,11 @@ type entry struct {
 //
 // It is safe for concurrent use from multiple goroutines.
 type ActorSystem struct {
-	mu      sync.RWMutex
-	actors  map[string]entry
-	order   []string // registration order for reverse shutdown
-	stopped bool
+	mu            sync.RWMutex
+	actors        map[string]entry
+	order         []string // registration order for reverse shutdown
+	stopped       bool
+	eventHandlers []EventHandler
 }
 
 // New creates a new ActorSystem with the specified options.
@@ -194,7 +195,12 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	s.stopped = true
 
 	// Snapshot the stop list and clear internal state while holding the lock.
-	snapshot := make([]ManagedActor, 0, len(s.actors))
+	type stopEntry struct {
+		name    string
+		managed ManagedActor
+	}
+
+	entries := make([]stopEntry, 0, len(s.actors))
 
 	for i := len(s.order) - 1; i >= 0; i-- {
 		name := s.order[i]
@@ -203,7 +209,7 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 		}
 
 		if e, exists := s.actors[name]; exists {
-			snapshot = append(snapshot, e.managed)
+			entries = append(entries, stopEntry{name: name, managed: e.managed})
 		}
 	}
 
@@ -212,12 +218,15 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 
 	s.mu.Unlock()
 
+	s.emitEvent(Event{Kind: EventSystemStopping})
+
 	var errs []error
 
-	for _, managed := range snapshot {
-		if err := managed.Stop(timeout); err != nil {
+	for _, e := range entries {
+		if err := e.managed.Stop(timeout); err != nil {
 			errs = append(errs, err)
 		}
+		s.emitEvent(Event{Kind: EventActorStopped, ActorName: e.name})
 	}
 
 	return errors.Join(errs...)

@@ -681,6 +681,116 @@ func (s *ActorSystemTestSuite) TestIntegration_FullFlow_ShouldWork() {
 	s.Equal(0, sys.Count())
 }
 
+// --- Spawn tests ---
+
+func (s *ActorSystemTestSuite) TestSpawn_ValidArgs_ShouldCreateAndRegister() {
+	// Arrange
+	sys := New()
+	entity := newTestEntity("spawn-test")
+	provider := &testEntityProvider{entity: entity}
+
+	// Act
+	ref, err := Spawn(sys, s.ctx, "spawned", provider, 100*time.Millisecond)
+
+	// Assert
+	s.NoError(err)
+	s.NotNil(ref)
+	s.Equal(1, sys.Count())
+	s.Equal(uint64(actor.Started), ref.State())
+}
+
+func (s *ActorSystemTestSuite) TestSpawn_DuplicateName_ShouldReturnError() {
+	// Arrange
+	sys := New()
+	entity := newTestEntity("test")
+	provider := &testEntityProvider{entity: entity}
+
+	_, err := Spawn(sys, s.ctx, "worker", provider, 100*time.Millisecond)
+	s.Require().NoError(err)
+
+	// Act
+	_, err = Spawn(sys, s.ctx, "worker", provider, 100*time.Millisecond)
+
+	// Assert
+	s.ErrorIs(err, ErrActorNameDuplicate)
+}
+
+func (s *ActorSystemTestSuite) TestSpawn_ShouldSetActorName() {
+	// Arrange
+	sys := New()
+	entity := newTestEntity("test")
+	provider := &testEntityProvider{entity: entity}
+
+	// Act
+	ref, err := Spawn(sys, s.ctx, "named-actor", provider, 100*time.Millisecond)
+	s.Require().NoError(err)
+
+	// Verify via Ask that the actor context has the correct name
+	result, err := Ask(sys, s.ctx, "named-actor", func(e *testEntity) (string, error) {
+		return e.GetValue(), nil
+	}, time.Second)
+
+	s.NoError(err)
+	s.Equal("test", result)
+	s.NotNil(ref)
+}
+
+// --- Event bus tests ---
+
+func (s *ActorSystemTestSuite) TestOnEvent_StopAll_ShouldEmitEvents() {
+	// Arrange
+	sys := New()
+	ref1, _ := s.newStartedRef()
+	ref2, _ := s.newStartedRef()
+
+	s.Require().NoError(Register(sys, "a", ref1))
+	s.Require().NoError(Register(sys, "b", ref2))
+
+	var events []Event
+	var mu sync.Mutex
+	sys.OnEvent(func(e Event) {
+		mu.Lock()
+		events = append(events, e)
+		mu.Unlock()
+	})
+
+	// Act
+	err := sys.StopAll(time.Second)
+	s.NoError(err)
+
+	// Assert
+	mu.Lock()
+	defer mu.Unlock()
+	s.GreaterOrEqual(len(events), 2) // At least SystemStopping + actor stops
+	s.Equal(EventSystemStopping, events[0].Kind)
+}
+
+func (s *ActorSystemTestSuite) TestOnEvent_Spawn_ShouldEmitStartEvent() {
+	// Arrange
+	sys := New()
+	entity := newTestEntity("test")
+	provider := &testEntityProvider{entity: entity}
+
+	var events []Event
+	var mu sync.Mutex
+	sys.OnEvent(func(e Event) {
+		mu.Lock()
+		events = append(events, e)
+		mu.Unlock()
+	})
+
+	// Act
+	_, err := Spawn(sys, s.ctx, "spawned", provider, 100*time.Millisecond)
+	s.Require().NoError(err)
+
+	// Assert
+	mu.Lock()
+	defer mu.Unlock()
+	s.Len(events, 1)
+	s.Equal(EventActorStarted, events[0].Kind)
+	s.Equal("spawned", events[0].ActorName)
+}
+
 // --- Benchmarks ---
 
 func BenchmarkRegister(b *testing.B) {
