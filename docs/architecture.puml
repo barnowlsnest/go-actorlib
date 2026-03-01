@@ -14,8 +14,15 @@ package "pkg/actor" as actor_pkg {
   component [GoActor<T>] as actor
   component [EntityProvider<T>] as provider
   component [Hooks] as hooks
+  component [BehaviorStack<T>] as behavior
+  component [GoActorContext<T>] as actorctx
+  component [Middleware<T>] as mw
   interface "Entity" as entity
   interface "Executable<T>" as executable
+}
+
+package "pkg/actorref" as ref_pkg {
+  component [Ref<T>] as ref
 }
 
 package "pkg/command" as command_pkg {
@@ -23,14 +30,55 @@ package "pkg/command" as command_pkg {
   component [DelegateFn<E,R>] as delegate
 }
 
-' Client relationships
-user --> actor : direct usage
-user --> command : creates commands
+package "pkg/ask" as ask_pkg {
+  component [ask.New<E,R>] as ask
+}
 
-' Actor relationships
+package "pkg/system" as system_pkg {
+  component [ActorSystem] as system
+  component [Spawn<T>] as spawn
+  component [EventBus] as eventbus
+}
+
+package "pkg/supervision" as sup_pkg {
+  component [Supervisor] as supervisor
+  component [ChildSpec] as childspec
+  component [RestartPolicy] as restartpolicy
+}
+
+package "pkg/middleware" as middleware_pkg {
+  component [Logging] as logging
+  component [Metrics] as metrics
+  component [Recovery] as recovery
+}
+
+package "pkg/deadletter" as dl_pkg {
+  component [Queue] as dlq
+}
+
+package "pkg/signal" as signal_pkg {
+  component [AwaitShutdown] as signal
+}
+
+package "pkg/mailbox" as mailbox_pkg {
+  component [PriorityMailbox<T>] as priombox
+}
+
+' Client relationships
+user --> ref : sends commands via
+user --> ask : request/response
+user --> system : registers actors
+user --> supervisor : manages lifecycles
+user --> signal : graceful shutdown
+
+' Core actor relationships
+ref --> actor : wraps
 actor --> provider : gets entity
 actor --> hooks : lifecycle events
 actor --> executable : processes
+actor --> behavior : dynamic handlers
+actor --> actorctx : injects into context
+actor --> mw : chains middleware
 provider --> entity : provides
 command ..|> executable : implements
 
@@ -38,11 +86,41 @@ command ..|> executable : implements
 command --> delegate : executes function
 delegate --> entity : operates on
 
-' Data flow annotations
-note right of actor : "Asynchronous message\nprocessing with entities"
-note right of command : "Type-safe operations\nwith return values"
+' Ask uses Ref
+ask --> ref : sends command via
+ask --> command : creates and awaits
 
-' State flow
-note top of actor : "States: Initialized → Started → Stopping → Done/Error"
+' System relationships
+system --> ref : manages refs
+spawn --> actor : creates
+spawn --> ref : wraps in
+spawn --> system : registers with
+eventbus --> system : emits events
+
+' Supervision
+supervisor --> childspec : starts children via
+supervisor --> restartpolicy : applies policy
+childspec --> actor : creates actors
+
+' Middleware implementations
+logging --> mw : implements
+metrics --> mw : implements
+recovery --> mw : implements
+
+' Signal integration
+signal --> system : calls StopAll
+signal --> supervisor : calls StopAll
+
+' Priority mailbox
+priombox --> executable : stores
+
+' Dead letter queue
+dlq ..> system : captures undelivered
+
+note top of actor_pkg : "Core: goroutine-based actor with\natomic state, CAS stop, middleware,\nbehavior stack, actor context"
+
+note bottom of system_pkg : "Lifecycle: name registry, Spawn\nconvenience, event bus, LIFO shutdown"
+
+note bottom of sup_pkg : "Supervision: OneForOne / AllForOne\nrestart, death watch, max frequency"
 
 @enduml

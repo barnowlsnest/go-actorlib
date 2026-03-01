@@ -1,0 +1,117 @@
+@startuml supervision
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Supervision: Restart Strategies and Death Watch
+
+participant "User Code" as user
+participant "Supervisor" as sup
+participant "ChildSpec A" as specA
+participant "ChildSpec B" as specB
+participant "ChildRef A" as childA
+participant "ChildRef B" as childB
+participant "Monitor A" as monA
+participant "Monitor B" as monB
+participant "WatchCallback" as watcher
+
+== Setup ==
+user -> sup : NewSupervisor(WithPolicy(policy))
+user -> sup : Add("worker-a", specA)
+user -> sup : Add("worker-b", specB)
+user -> sup : Watch(callback)
+
+== StartAll ==
+user -> sup : StartAll(ctx, timeout)
+activate sup
+
+sup -> specA : Start(ctx)
+activate specA
+specA --> sup : childRefA
+deactivate specA
+sup -> monA : go monitor(ctx, childA, version=1)
+activate monA
+
+sup -> specB : Start(ctx)
+activate specB
+specB --> sup : childRefB
+deactivate specB
+sup -> monB : go monitor(ctx, childB, version=1)
+activate monB
+
+sup --> user : nil
+deactivate sup
+
+note over monA, monB : Monitors wait on <-childRef.Done()\nEach captures version at start time
+
+== Child Failure (OneForOne Strategy) ==
+
+childA -> childA : **PANIC**
+childA -> monA : <-Done() fires
+monA -> monA : check version == current?\n(prevents stale restarts)
+
+monA -> watcher : callback("worker-a", Panicked)
+
+monA -> sup : restartOne(ctx, childA)
+activate sup
+sup -> specA : Start(ctx)
+activate specA
+specA --> sup : new childRefA
+deactivate specA
+sup -> sup : childA.version++ (now 2)
+sup -> monA : go monitor(ctx, childA, version=2)
+note right : New monitor with updated version\nOld monitor already exited
+deactivate sup
+deactivate monA
+
+note over childB : **childB unaffected**\n(OneForOne: only failed child restarts)
+
+== Child Failure (AllForOne Strategy) ==
+
+childB -> childB : **ERROR**
+childB -> monB : <-Done() fires
+
+monB -> watcher : callback("worker-b", StoppedWithError)
+
+monB -> sup : restartAll(ctx)
+activate sup
+
+sup -> sup : Bump all child versions\n(invalidates stale monitors)
+sup -> childA : Stop(timeout)
+note right : childA monitor sees\nversion mismatch → exits
+sup -> childB : (already stopped)
+
+sup -> specA : Start(ctx)
+sup -> specB : Start(ctx)
+sup -> sup : New monitors with fresh versions
+deactivate sup
+deactivate monB
+
+note over childA, childB
+  **AllForOne:** All children stopped
+  and restarted when any child fails
+end note
+
+== Max Restart Frequency ==
+
+note over sup
+  **RestartPolicy:**
+  MaxRestarts: N within Duration
+
+  If exceeded, supervisor stops
+  restarting (gives up). Watchers
+  are still notified of termination.
+
+  Restart timestamps are tracked
+  in a sliding time window.
+end note
+
+== StopAll ==
+user -> sup : StopAll(timeout)
+activate sup
+sup -> childB : Stop(timeout)
+sup -> childA : Stop(timeout)
+note right : Reverse registration order (LIFO)
+sup --> user : nil (or joined errors)
+deactivate sup
+
+@enduml

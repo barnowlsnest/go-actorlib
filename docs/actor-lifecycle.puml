@@ -4,25 +4,25 @@ skinparam backgroundColor #FFFFFF
 
 title Actor Lifecycle State Machine
 
-state "Initialized" as init : Actor created but not started
-state "Started" as started : Processing messages
-state "Stopping" as stopping : Graceful shutdown in progress
+state "Initialized" as init : Actor created but not started\n(ready, done, stop channels allocated)
+state "Started" as started : Processing messages from input channel\nBehaviorStack active, GoActorContext injected
+state "Stopping" as stopping : Stop channel closed\nNo new messages accepted
 state "Done" as done : Successfully stopped
 state "StoppedWithError" as error : Stopped due to error
 state "Cancelled" as cancelled : Context cancelled
 state "Panicked" as panicked : Recovered from panic
 
-[*] --> init : actor.New()
+[*] --> init : actor.New(opts...)\nor actor.StartNew()
 
-init --> started : Start()
-init --> error : Start() fails
+init --> started : Start(ctx)\n[CheckState(Initialized) guard]
+init --> error : Start() fails\n(e.g. provider missing)
 
-started --> stopping : Stop() called
+started --> stopping : Stop()\n[atomic.CompareAndSwapUint64]\nclose(stop channel)
 started --> cancelled : Context cancelled
-started --> panicked : Panic recovered
+started --> panicked : Panic recovered\n(catchPanic → OnError hook)
 started --> error : Error during execution
 
-stopping --> done : Graceful shutdown complete
+stopping --> done : Graceful shutdown complete\nclose(done channel)
 stopping --> error : Shutdown timeout
 stopping --> cancelled : Context cancelled during stop
 
@@ -31,8 +31,40 @@ error --> [*]
 cancelled --> [*]
 panicked --> [*]
 
-note right of started : "Hooks: BeforeStart, AfterStart\nProcessing Executable commands"
-note right of stopping : "Hooks: BeforeStop, AfterStop\nNo new messages accepted"
-note bottom of error : "Terminal state\nHooks: OnError"
+note right of init
+  **Channels allocated:**
+  • input: bounded message queue
+  • ready: closed when started
+  • done: closed on termination
+  • stop: closed to signal shutdown
+end note
+
+note right of started
+  **Processing loop:**
+  select {
+    case msg := <-input:
+      behavior.Current()(ctx, msg, entity)
+    case <-stop:
+      transition to Done
+  }
+
+  **Hooks:** BeforeStart, AfterStart
+  **Middleware:** chain applied to handler
+  **GoActorContext:** injected via context.WithValue
+end note
+
+note right of stopping
+  **CAS-based Stop:**
+  CompareAndSwap(Started → Stopping)
+  ensures concurrent Stop() calls are safe
+
+  **Hooks:** BeforeStop, AfterStop
+end note
+
+note bottom of error
+  **Terminal state**
+  Hooks: OnError
+  done channel closed
+end note
 
 @enduml

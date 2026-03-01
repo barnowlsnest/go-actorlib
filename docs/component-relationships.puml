@@ -26,82 +26,271 @@ package "Type System" {
   }
 }
 
-package "Actor System" {
+package "Actor Core (pkg/actor)" {
   class "GoActor<T>" as GoActor {
-    -receiveTimeout time.Duration
-    -inputBufSize uint64
     -state uint64
     -input chan Executable<T>
     -done chan struct{}
     -ready chan struct{}
+    -stop chan struct{}
+    -name string
     -hooks Hooks
     -provider EntityProvider<T>
+    -behavior *BehaviorStack<T>
+    -actorCtx *GoActorContext<T>
+    -middleware []Middleware<T>
     --
-    +New(...GoActorOption<T>) (*GoActor<T>, error)
+    +{static} New(opts...) (*GoActor<T>, error)
+    +{static} StartNew(ctx, timeout, opts...) (*GoActor<T>, error)
     +Start(context.Context) error
     +Stop(time.Duration) error
     +Receive(context.Context, Executable<T>) error
     +WaitReady(context.Context, time.Duration) error
     +State() uint64
+    +Name() string
+    +Done() <-chan struct{}
   }
 
-  class "GoActorOption<T>" as GoActorOption {
+  class "HandlerFunc<T>" as HandlerFunc <<type>> {
+    func(ctx, Executable<T>, T)
+  }
+
+  class "Middleware<T>" as MiddlewareType <<type>> {
+    func(next HandlerFunc<T>) HandlerFunc<T>
+  }
+
+  class "BehaviorStack<T>" as BehaviorStack {
+    -stack []HandlerFunc<T>
+    --
+    +Current() HandlerFunc<T>
+    +Become(HandlerFunc<T>)
+    +BecomeReplace(HandlerFunc<T>)
+    +Unbecome() bool
+    +Depth() int
+  }
+
+  class "GoActorContext<T>" as GoActorContext {
+    -behavior *BehaviorStack<T>
+    -name string
+    --
+    +Become(HandlerFunc<T>)
+    +BecomeReplace(HandlerFunc<T>)
+    +Unbecome() bool
+    +Name() string
+    ..
+    +{static} GetGoActorContext<T>(ctx) *GoActorContext<T>
+  }
+
+  class "GoActorOption<T>" as GoActorOption <<type>> {
     +WithProvider(EntityProvider<T>)
-    +WithInputBufferSize(uint64)
+    +WithInputBufferSize(int)
     +WithReceiveTimeout(time.Duration)
     +WithHooks(Hooks)
+    +WithName(string)
+    +WithMiddleware(Middleware<T>...)
   }
 }
 
-package "Command System" {
+package "Actor Ref (pkg/actorref)" {
+  class "Ref<T>" as Ref {
+    -actor *GoActor<T>
+    --
+    +{static} New(actor) (*Ref<T>, error)
+    +Send(context.Context, Executable<T>) error
+    +Stop(time.Duration) error
+    +State() uint64
+    +Done() <-chan struct{}
+  }
+}
+
+package "Command System (pkg/command)" {
   class "GoCommand<E,R>" as GoCommand {
-    -mu sync.Mutex
     -state int
     -done chan R
     -err error
     -delegateFn DelegateFn<E,R>
     --
-    +New(DelegateFn<E,R>) *GoCommand<E,R>
+    +{static} New(DelegateFn<E,R>) *GoCommand<E,R>
     +Execute(context.Context, E)
     +Done() <-chan R
     +Error() error
     +State() int
   }
 
-  class "DelegateFn<T,R>" as DelegateFn {
+  class "DelegateFn<T,R>" as DelegateFn <<type>> {
     func(entity T) (R, error)
   }
 }
 
-' Inheritance relationships
-GoCommand ..|> Executable
+package "Ask (pkg/ask)" {
+  class "ask.New<E,R>" as AskNew <<function>> {
+    +New(ctx, ref, fn, timeout) (R, error)
+  }
+}
 
-' Composition relationships
+package "Actor System (pkg/system)" {
+  interface ManagedActor {
+    +Stop(time.Duration) error
+    +State() uint64
+  }
+
+  class ActorSystem {
+    -actors map[string]entry
+    -order []string
+    -eventHandlers []EventHandler
+    --
+    +{static} New(opts...) *ActorSystem
+    +Get(name) (ManagedActor, error)
+    +Unregister(name) error
+    +StopAll(timeout) error
+    +Count() int
+    +OnEvent(EventHandler)
+  }
+
+  class "Spawn<T>" as Spawn <<function>> {
+    +Spawn(sys, ctx, name, provider, timeout, opts...) (*Ref<T>, error)
+  }
+
+  class Event {
+    +Kind EventKind
+    +ActorName string
+  }
+}
+
+package "Supervision (pkg/supervision)" {
+  interface ChildSpec {
+    +Start(context.Context) (ChildRef, error)
+  }
+
+  interface ChildRef {
+    +Stop(time.Duration) error
+    +State() uint64
+    +Done() <-chan struct{}
+  }
+
+  class Supervisor {
+    -policy RestartPolicy
+    -children []*child
+    -watchers []WatchCallback
+    --
+    +{static} NewSupervisor(opts...) *Supervisor
+    +Add(name, ChildSpec) error
+    +StartAll(ctx, timeout) error
+    +StopAll(timeout) error
+    +Watch(WatchCallback)
+    +Children() []string
+    +ChildState(name) (uint64, error)
+  }
+
+  class RestartPolicy {
+    +Strategy Strategy
+    +MaxRestarts int
+    +WithinDuration time.Duration
+  }
+}
+
+package "Middleware (pkg/middleware)" {
+  class Logging <<function>> {
+    +Logging(logger) Middleware<T>
+  }
+
+  class "Metrics" as MetricsClass {
+    -messageCount atomic.Int64
+    -totalDuration atomic.Int64
+    --
+    +Middleware() Middleware<T>
+    +MessageCount() int64
+    +TotalDuration() time.Duration
+    +AverageDuration() time.Duration
+  }
+
+  class Recovery <<function>> {
+    +Recovery(logger) Middleware<T>
+  }
+}
+
+package "Dead Letter (pkg/deadletter)" {
+  class Queue {
+    -letters []Letter
+    -capacity int
+    -handlers []Handler
+    --
+    +{static} New(opts...) *Queue
+    +Publish(Letter)
+    +OnDeadLetter(Handler)
+    +Letters() []Letter
+    +Count() int
+    +Clear()
+  }
+
+  class Letter {
+    +Target string
+    +Reason string
+  }
+}
+
+package "Mailbox (pkg/mailbox)" {
+  class "PriorityMailbox<T>" as PriorityMailbox {
+    -heap *Heap<message<T>>
+    -notify chan struct{}
+    --
+    +{static} NewPriority(maxSize) *PriorityMailbox<T>
+    +Push(Executable<T>, Priority) bool
+    +Pop() (Executable<T>, bool)
+    +Notify() <-chan struct{}
+    +Size() int
+    +Close()
+    +IsEmpty() bool
+  }
+}
+
+' Inheritance / implementation
+GoCommand ..|> Executable
+Ref ..|> ManagedActor
+Ref ..|> ChildRef
+
+' Composition
 GoActor *-- EntityProvider
 GoActor *-- Hooks
+GoActor *-- BehaviorStack
+GoActor *-- GoActorContext
 GoActor o-- Executable : processes
+GoActor o-- MiddlewareType : chains
 GoCommand *-- DelegateFn
+Ref --> GoActor : wraps
 
 ' Dependencies
 EntityProvider ..> Entity : provides
 DelegateFn ..> Entity : operates on
 Executable ..> Entity : processes
 GoActorOption ..> GoActor : configures
+HandlerFunc ..> Executable : handles
+GoActorContext --> BehaviorStack : delegates to
 
-note bottom of GoActor : "Generic actor processing\nExecutable<T> commands on\nentities provided by EntityProvider<T>"
-
-note bottom of GoCommand : "Type-safe command wrapping\nDelegateFn<E,R> for async\nexecution with results"
-
-package "Ask Convenience" {
-  class "ask.New<E,R>" as AskNew {
-    +New(ctx, actor, fn, timeout) (R, error)
-  }
-}
-
-AskNew ..> GoActor : sends command via Receive
+' Ask uses Ref
+AskNew ..> Ref : sends command via
 AskNew ..> GoCommand : creates and awaits
 AskNew ..> DelegateFn : wraps into command
 
-note bottom of AskNew : "Convenience function:\nsingle-call request/response\nwith timeout"
+' System
+ActorSystem o-- ManagedActor : manages
+Spawn ..> GoActor : creates
+Spawn ..> Ref : wraps in
+Spawn ..> ActorSystem : registers with
+ActorSystem --> Event : emits
+
+' Supervision
+Supervisor o-- ChildSpec : manages
+Supervisor --> RestartPolicy : applies
+Supervisor --> ChildRef : monitors
+ChildSpec ..> ChildRef : creates
+
+' Middleware implementations
+Logging ..> MiddlewareType : returns
+MetricsClass ..> MiddlewareType : returns
+Recovery ..> MiddlewareType : returns
+
+' Mailbox
+PriorityMailbox o-- Executable : stores
 
 @enduml

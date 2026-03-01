@@ -1,0 +1,118 @@
+@startuml system-lifecycle
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Actor System Lifecycle: Spawn, Events, and Shutdown
+
+participant "User Code" as user
+participant "OS Signal\n(SIGTERM/SIGINT)" as signal
+participant "ActorSystem" as sys
+participant "EventHandler" as handler
+participant "actor.New" as factory
+participant "Ref<T>" as ref
+participant "GoActor<T>" as actor
+
+== System Setup ==
+user -> sys : system.New()
+user -> sys : OnEvent(eventHandler)
+
+== Spawn Actor (Convenience) ==
+user -> sys : system.Spawn(sys, ctx, "worker-1", provider, timeout, opts...)
+activate sys
+
+sys -> factory : actor.New(WithProvider, WithName("worker-1"), opts...)
+factory --> sys : goActor
+
+sys -> actor : Start(ctx)
+activate actor
+actor --> sys : nil
+
+sys -> actor : WaitReady(ctx, timeout)
+actor --> sys : nil (ready)
+
+sys -> ref : actorref.New(goActor)
+ref --> sys : ref
+
+sys -> sys : Register("worker-1", ref)
+
+sys -> handler : **EventActorStarted**\n{Kind: Started, ActorName: "worker-1"}
+
+sys --> user : (ref, nil)
+deactivate sys
+
+== Spawn Second Actor ==
+user -> sys : system.Spawn(sys, ctx, "worker-2", provider, timeout)
+activate sys
+note right : Same flow: New → Start → WaitReady → Ref → Register
+sys -> handler : **EventActorStarted**\n{ActorName: "worker-2"}
+sys --> user : (ref, nil)
+deactivate sys
+
+== Direct Registration (Alternative) ==
+note over user
+  Manual flow:
+  a := actor.New(opts...)
+  a.Start(ctx)
+  a.WaitReady(ctx, timeout)
+  ref := actorref.New(a)
+  system.Register(sys, "worker-3", ref)
+end note
+
+== Using the System ==
+user -> sys : system.Send(sys, ctx, "worker-1", cmd)
+sys -> ref : ref.Send(ctx, cmd)
+
+user -> sys : system.Ask(sys, ctx, "worker-1", fn, timeout)
+note right : Combines command creation,\nsend via ref, and result waiting
+
+user -> sys : sys.Get("worker-1")
+sys --> user : (ManagedActor, nil)
+
+user -> sys : sys.Count()
+sys --> user : 3
+
+== Spawn Failure (Automatic Cleanup) ==
+user -> sys : system.Spawn(sys, ctx, "duplicate", provider, timeout)
+activate sys
+sys -> sys : Register("duplicate", ref)
+sys --> sys : ErrActorAlreadyRegistered
+sys -> ref : ref.Stop(timeout)
+note right : Best effort: stop the actor\nsince registration failed
+sys --> user : (nil, error)
+deactivate sys
+
+== Graceful Shutdown (via Signal) ==
+
+signal -> signal : SIGTERM received
+signal -> sys : signal.AwaitShutdown(ctx, sys, timeout)
+activate sys
+
+sys -> handler : **EventSystemStopping**\n{Kind: SystemStopping}
+
+note over sys
+  **LIFO Shutdown Order:**
+  Last registered → first stopped
+  (worker-3, worker-2, worker-1)
+end note
+
+sys -> ref : Stop("worker-3", timeout)
+sys -> handler : **EventActorStopped**\n{ActorName: "worker-3"}
+
+sys -> ref : Stop("worker-2", timeout)
+sys -> handler : **EventActorStopped**\n{ActorName: "worker-2"}
+
+sys -> ref : Stop("worker-1", timeout)
+sys -> handler : **EventActorStopped**\n{ActorName: "worker-1"}
+
+deactivate actor
+sys --> signal : nil (or joined errors)
+deactivate sys
+
+note over user, sys
+  **Signal Integration Options:**
+  • signal.AwaitShutdown(ctx, sys, timeout) — blocks until signal, then StopAll
+  • signal.NotifyShutdown() — returns channel for manual handling
+  • Works with both ActorSystem and Supervisor (Stoppable interface)
+end note
+
+@enduml
