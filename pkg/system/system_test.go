@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
-	"github.com/barnowlsnest/go-actorlib/v2/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v3/pkg/command"
 )
 
 // --- Test helpers ---
@@ -684,42 +684,23 @@ func (s *ActorSystemTestSuite) TestIntegration_FullFlow_ShouldWork() {
 // --- Benchmarks ---
 
 func BenchmarkRegister(b *testing.B) {
-	sys := New()
-	ctx := context.Background()
+	var stopLog []string
+	dispatch := func(_ context.Context, _ any) error { return nil }
 
-	refs := make([]*actorref.Ref[*testEntity], b.N)
+	// Pre-generate names and mocks.
+	names := make([]string, b.N)
+	mocks := make([]*mockManagedActor, b.N)
+
 	for i := range b.N {
-		entity := newTestEntity("bench")
-		provider := &testEntityProvider{entity: entity}
-
-		a, err := actor.New(
-			actor.WithProvider(provider),
-			actor.WithInputBufferSize[*testEntity](10),
-		)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		if err = a.Start(ctx); err != nil {
-			b.Fatal(err)
-		}
-
-		if err = a.WaitReady(ctx, 100*time.Millisecond); err != nil {
-			b.Fatal(err)
-		}
-
-		ref, err := actorref.New(a)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		refs[i] = ref
+		names[i] = fmt.Sprintf("actor-%d", i)
+		mocks[i] = newMockActor(names[i], &stopLog)
 	}
 
+	sys := New()
 	b.ResetTimer()
 
 	for i := range b.N {
-		_ = Register(sys, fmt.Sprintf("actor-%d", i), refs[i])
+		_ = sys.register(names[i], mocks[i], dispatch)
 	}
 }
 
@@ -776,17 +757,30 @@ func BenchmarkSend(b *testing.B) {
 }
 
 func BenchmarkStopAll(b *testing.B) {
-	for range b.N {
-		b.StopTimer()
+	const actorCount = 100
+
+	names := make([]string, actorCount)
+	for i := range actorCount {
+		names[i] = fmt.Sprintf("actor-%d", i)
+	}
+
+	// Pre-build all systems before the timed loop.
+	systems := make([]*ActorSystem, b.N)
+	for n := range b.N {
 		sys := New()
 		var stopLog []string
 
-		for i := range 100 {
-			mock := newMockActor(fmt.Sprintf("actor-%d", i), &stopLog)
-			_ = sys.register(fmt.Sprintf("actor-%d", i), mock, nil)
+		for i := range actorCount {
+			mock := newMockActor(names[i], &stopLog)
+			_ = sys.register(names[i], mock, nil)
 		}
 
-		b.StartTimer()
-		_ = sys.StopAll(100 * time.Millisecond)
+		systems[n] = sys
+	}
+
+	b.ResetTimer()
+
+	for n := range b.N {
+		_ = systems[n].StopAll(100 * time.Millisecond)
 	}
 }

@@ -103,7 +103,7 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 `ActorRef` decouples the **lifecycle owner** (who creates and starts the actor) from **senders** (who only need to send messages). The ref exposes only `Send`, `Stop`, and `State` — callers cannot call `Start`, `WaitReady`, or access internals.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v2/pkg/actorref"
+import "github.com/barnowlsnest/go-actorlib/v3/pkg/actorref"
 
 // Lifecycle owner creates the actor and keeps the *GoActor pointer private
 ref, err := actorref.New(myActor)
@@ -147,7 +147,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context) error {
 The `ask` package collapses command creation, sending, waiting, and error checking into a single call. It accepts an `*actorref.Ref[E]`:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v2/pkg/ask"
+import "github.com/barnowlsnest/go-actorlib/v3/pkg/ask"
 
 result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
     counter.Value++

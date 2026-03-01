@@ -211,7 +211,7 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	s.order = nil
 
 	s.mu.Unlock()
-	
+
 	var errs []error
 
 	for _, managed := range snapshot {
