@@ -18,7 +18,7 @@ import (
 
 	"github.com/barnowlsnest/go-datalib/pkg/tree"
 
-	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // Priority defines message priority levels.

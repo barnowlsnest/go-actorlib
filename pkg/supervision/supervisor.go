@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // ChildSpec defines how to create and start a child actor.

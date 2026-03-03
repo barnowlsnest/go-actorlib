@@ -87,8 +87,8 @@ The simplest way to create, start, and obtain a reference:
 
 ```go
 import (
-    "github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
-    "github.com/barnowlsnest/go-actorlib/v3/pkg/actorref"
+    "github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
+    "github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
 )
 
 ctx := context.Background()
@@ -135,7 +135,7 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 `ActorRef` decouples the **lifecycle owner** (who creates and starts the actor) from **senders** (who only need to send messages). The ref exposes only `Send`, `Stop`, `State`, and `Done` — callers cannot call `Start`, `WaitReady`, or access internals.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/actorref"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
 
 ref, err := actorref.New(myActor)
 if err != nil {
@@ -176,7 +176,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context) error {
 The `ask` package collapses command creation, sending, waiting, and error checking into a single call. It accepts an `*actorref.Ref[E]`:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/ask"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
 
 result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
     counter.Value++
@@ -194,7 +194,7 @@ The `system` package provides a name-based registry with a `Spawn` convenience t
 
 ```go
 import (
-    "github.com/barnowlsnest/go-actorlib/v3/pkg/system"
+    "github.com/barnowlsnest/go-actorlib/v4/pkg/system"
 )
 
 sys := system.New()
@@ -232,7 +232,7 @@ sys.StopAll(10 * time.Second)
 The `supervision` package monitors child actors and restarts them on failure:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/supervision"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/supervision"
 
 sup := supervision.NewSupervisor(
     supervision.WithPolicy(supervision.RestartPolicy{
@@ -297,7 +297,7 @@ func authenticatedHandler(ctx context.Context, e actor.Executable[*MyEntity], en
 Add cross-cutting concerns to actor message processing with composable middleware:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/middleware"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/middleware"
 
 metrics := &middleware.Metrics{}
 
@@ -320,7 +320,7 @@ fmt.Printf("processed: %d, avg: %s\n", metrics.MessageCount(), metrics.AverageDu
 Capture undeliverable messages for debugging and monitoring:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/deadletter"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/deadletter"
 
 dlq := deadletter.New(deadletter.WithCapacity(1000))
 
@@ -334,7 +334,7 @@ dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: "actor stopped"})
 ### 12. Graceful Shutdown with OS Signals
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/signal"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/signal"
 
 // Block until SIGTERM/SIGINT, then stop the system
 err := signal.AwaitShutdown(ctx, sys, 10*time.Second)
@@ -351,7 +351,7 @@ sys.StopAll(10 * time.Second)
 Messages with higher priority are processed first:
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v3/pkg/mailbox"
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/mailbox"
 
 mb := mailbox.NewPriority[*MyEntity](100)
 
