@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // Logging returns a middleware that logs each message processed by an actor.

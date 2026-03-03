@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // Metrics collects message processing statistics for an actor.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v3/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // Ref is an immutable, lightweight handle for interacting with an actor.
