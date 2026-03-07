@@ -20,30 +20,6 @@ task go-fmt          # Format code
 task go-tidy         # go mod tidy
 ```
 
-Run a single test:
-```bash
-go test -run TestName ./pkg/actor/
-go test -run TestName ./pkg/actorref/
-go test -run TestName ./pkg/command/
-go test -run TestName ./pkg/ask/
-go test -run TestName ./pkg/system/
-go test -run TestName ./pkg/supervision/
-go test -run TestName ./pkg/middleware/
-go test -run TestName ./pkg/deadletter/
-go test -run TestName ./pkg/signal/
-go test -run TestName ./pkg/mailbox/
-```
-
-Tests use testify suites, so individual test methods are run as subtests:
-```bash
-go test -run TestGoActorTestSuite/TestMethodName ./pkg/actor/
-go test -run TestActorRefTestSuite/TestMethodName ./pkg/actorref/
-go test -run TestGoCommandTestSuite/TestMethodName ./pkg/command/
-go test -run TestGoAskTestSuite/TestMethodName ./pkg/ask/
-go test -run TestSupervisorTestSuite/TestMethodName ./pkg/supervision/
-go test -run TestPriorityMailboxTestSuite/TestMethodName ./pkg/mailbox/
-```
-
 Run fuzz tests:
 ```bash
 go test -fuzz FuzzActorLifecycle -fuzztime 5s ./pkg/actor/
