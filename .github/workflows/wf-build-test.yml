@@ -16,7 +16,7 @@ jobs:
           go-version: ${{ vars.GO_VERSION }}
       - uses: go-task/setup-task@v1
         with:
-          version: 2.x
+          version: 3.x
 
       - name: Build
         run: task go-build
