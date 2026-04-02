@@ -1,4 +1,4 @@
-name: wf-golangci-lint.yml
+name: 'golangci-lint.yml'
 run-name: 'Lint'
 
 on:

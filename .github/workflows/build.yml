@@ -1,4 +1,4 @@
-name: wf-build-test.yml
+name: 'build.yml'
 run-name: 'Build and Test'
 
 on:
