@@ -1,0 +1,23 @@
+name: pull-request
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: {{ vars.GO_VERSION }}
+      - uses: tenthirtyam/setup-task@v1
+        with:
+          version: 'latest'
+
+      - name: Build
+        run: task go-build
+
+      - name: Test
+        run: task go-test

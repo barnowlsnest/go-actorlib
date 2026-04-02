@@ -32,7 +32,7 @@ tasks:
       - go test -race -cover '{{.ALL_GO_FILES}}'
       - go test -race -bench=. '{{.ALL_GO_FILES}}'
 
-  go-lint:
+  go-lint-fix:
     desc: Run golangci-lint
     cmds:
       - golangci-lint run --fix
@@ -42,7 +42,7 @@ tasks:
     deps:
       - go-tidy
       - go-fmt
-      - go-lint
+      - go-lint-fix
       - go-build
       - go-vet
       - go-test
