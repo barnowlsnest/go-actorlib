@@ -39,7 +39,6 @@ Go already provides goroutines, channels, and `sync.Mutex` — so why add an act
 - **Overhead for trivial concurrency.** If you just need a goroutine-safe counter or a simple fan-out, a `sync.Mutex` or a bare channel is lighter and more idiomatic.
 - **Latency from message passing.** Every interaction goes through a channel send and sequential processing. For hot paths that need sub-microsecond shared reads, a `sync.RWMutex` or `sync/atomic` will be faster.
 - **Debugging indirection.** Stack traces stop at channel operations. Tracing a request across multiple actors requires correlation IDs or structured logging — the call chain is no longer visible in a single stack.
-- **Learning curve.** Developers familiar with Go's stdlib concurrency need to shift from "protect shared state with a lock" to "send a message and wait for a result."
 
 ### When to use
 
