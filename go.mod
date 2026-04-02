@@ -1,6 +1,6 @@
 module github.com/barnowlsnest/go-actorlib/v4
 
-go 1.25
+go 1.26.1
 
 require (
 	github.com/barnowlsnest/go-datalib v0.0.0-20260201014700-be56b0e24ef7
