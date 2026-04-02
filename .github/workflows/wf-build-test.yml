@@ -1,4 +1,5 @@
 name: wf-build-test.yml
+run-name: 'Build and Test'
 
 on:
   pull_request:
