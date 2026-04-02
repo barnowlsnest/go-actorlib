@@ -1,4 +1,5 @@
 name: wf-golangci-lint.yml
+
 on:
   pull_request:
   push:
