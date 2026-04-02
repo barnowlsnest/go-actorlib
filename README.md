@@ -411,7 +411,7 @@ task go-tidy      # go mod tidy
 
 ## Requirements
 
-- Go 1.25 or later
+- Go 1.26.1 or later
 - Dependencies: [go-datalib](https://github.com/barnowlsnest/go-datalib) (Heap for priority mailbox), testify (tests only)
 
 ## License
