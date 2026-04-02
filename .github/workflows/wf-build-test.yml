@@ -1,7 +1,9 @@
-name: wf-pull-request.yml
+name: wf-build-test.yml
 
 on:
   pull_request:
+    branches: [ "main" ]
+  push:
     branches: [ "main" ]
 
 jobs:
