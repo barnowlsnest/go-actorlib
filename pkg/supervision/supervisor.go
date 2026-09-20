@@ -93,8 +93,8 @@ func WithPolicy(policy RestartPolicy) Option {
 	}
 }
 
-// WithStopTimeout sets the timeout used when stopping children during restarts.
-// Defaults to 5 seconds.
+// WithStopTimeout sets the timeout used when stopping children during AllForOne restarts
+// and StopAll sibling stops. Defaults to 5 seconds.
 func WithStopTimeout(timeout time.Duration) Option {
 	return func(s *Supervisor) {
 		s.stopTimeout = timeout
@@ -175,7 +175,13 @@ func (s *Supervisor) Add(name string, spec ChildSpec) error {
 
 // StartAll starts all registered children in order.
 // It monitors each child for termination and handles restarts according to the policy.
+//
+// readyTimeout is unused by the supervisor. ChildSpec.Start must apply its own readiness
+// deadline (for example via actor.StartNew) while treating ctx as the actor lifetime —
+// do not cancel ctx when Start returns.
 func (s *Supervisor) StartAll(ctx context.Context, readyTimeout time.Duration) error {
+	_ = readyTimeout
+
 	s.mu.Lock()
 	if s.stopped {
 		s.mu.Unlock()
@@ -186,22 +192,15 @@ func (s *Supervisor) StartAll(ctx context.Context, readyTimeout time.Duration) e
 	s.mu.Unlock()
 
 	for _, c := range children {
-		if err := s.startChild(ctx, c, readyTimeout); err != nil {
+		if err := s.startChild(ctx, c); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Supervisor) startChild(ctx context.Context, c *child, readyTimeout time.Duration) error {
-	startCtx := ctx
-	var cancel context.CancelFunc
-	if readyTimeout > 0 {
-		startCtx, cancel = context.WithTimeout(ctx, readyTimeout)
-		defer cancel()
-	}
-
-	ref, err := c.spec.Start(startCtx)
+func (s *Supervisor) startChild(ctx context.Context, c *child) error {
+	ref, err := c.spec.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -296,7 +295,7 @@ func (s *Supervisor) handleTermination(ctx context.Context, c *child) {
 }
 
 func (s *Supervisor) restartOne(ctx context.Context, c *child) {
-	if err := s.startChild(ctx, c, s.stopTimeout); err != nil {
+	if err := s.startChild(ctx, c); err != nil {
 		s.notifyRestartError(c.name, err)
 	}
 }
@@ -322,7 +321,7 @@ func (s *Supervisor) restartAll(ctx context.Context) {
 
 	// Restart all children
 	for _, c := range children {
-		if err := s.startChild(ctx, c, s.stopTimeout); err != nil {
+		if err := s.startChild(ctx, c); err != nil {
 			s.notifyRestartError(c.name, err)
 		}
 	}

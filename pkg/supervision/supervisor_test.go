@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
 )
 
 var (
@@ -486,4 +487,39 @@ func (s *SupervisorTestSuite) TestOneForOne_CleanStop_ShouldNotRestart() {
 
 	// Should NOT have been restarted
 	s.Equal(1, spec.startCount())
+}
+
+type supervisedEntity struct{}
+
+func (e *supervisedEntity) IsProvidable() bool { return true }
+
+type supervisedEntityProvider struct{ entity *supervisedEntity }
+
+func (p *supervisedEntityProvider) Provide() *supervisedEntity { return p.entity }
+
+// actorStartNewSpec uses actor.StartNew with the supervisor ctx as lifetime (README pattern).
+type actorStartNewSpec struct{}
+
+func (s *actorStartNewSpec) Start(ctx context.Context) (ChildRef, error) {
+	a, err := actor.StartNew(ctx, time.Second,
+		actor.WithProvider(&supervisedEntityProvider{&supervisedEntity{}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return actorref.New(a)
+}
+
+func (s *SupervisorTestSuite) TestStartAll_WithActorStartNew_ShouldKeepChildStarted() {
+	sup := NewSupervisor()
+	s.Require().NoError(sup.Add("worker", &actorStartNewSpec{}))
+	s.Require().NoError(sup.StartAll(s.ctx, 50*time.Millisecond))
+
+	time.Sleep(100 * time.Millisecond)
+
+	state, err := sup.ChildState("worker")
+	s.NoError(err)
+	s.Equal(uint64(actor.Started), state)
+
+	s.NoError(sup.StopAll(time.Second))
 }

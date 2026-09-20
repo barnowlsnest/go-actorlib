@@ -76,7 +76,7 @@ Ten packages under `pkg/`.
 - **`ActorSystem`** — Flat name registry. Thread-safe. After `StopAll`, further ops return `ErrSystemStopped`.
 - **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
-- **`Spawn[T]`** — `actor.New` + `Start` + `WaitReady` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On register failure, stops the actor (best effort) so the system is unchanged.
+- **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
 
@@ -87,9 +87,10 @@ Ten packages under `pkg/`.
 - **`ChildRef`** — `Stop`, `State`, `Done` (needed for death watch). `actorref.Ref` satisfies this. Broader than `system.ManagedActor`.
 - **Strategies**: `OneForOne` (restart only the failed child), `AllForOne` (stop+restart all). Clean `actor.Done` does **not** restart.
 - **`RestartPolicy`** — Strategy, `MaxRestarts` (0 = unlimited), `WithinDuration`. **`DefaultRestartPolicy()`**: OneForOne, max 3 within 5s.
-- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping siblings on AllForOne and as restart start timeout).
+- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
+- **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
 
