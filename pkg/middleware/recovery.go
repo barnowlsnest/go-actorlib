@@ -6,7 +6,7 @@ import (
 
 	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 
-	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 )
 
 // Recovery returns a middleware that recovers from panics in downstream handlers.

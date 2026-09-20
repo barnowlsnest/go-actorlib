@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
 )
 
 // Spawn creates, starts, and registers an actor in the system in one operation.
