@@ -1,115 +1,175 @@
 # go-actorlib
 
-A lightweight, type-safe actor library for Go implementing the Actor Model pattern. Built with Go's goroutines and channels for high-performance concurrent applications.
+A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model) library for Go. Actors run on native goroutines and channels — no extra runtime, no shared mutable state.
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/go-actorlib/v4.svg)](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/barnowlsnest/go-actorlib)](go.mod)
+[![Build](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml)
+[![Lint](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**Module:** [`github.com/barnowlsnest/go-actorlib/v4`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4) · **Go:** 1.27+ · **License:** [MIT](LICENSE)
 
 ## Features
 
-- **Type-Safe**: Generic interfaces ensure compile-time type safety for entities and commands
-- **Lightweight**: Minimal overhead using Go's native concurrency primitives
-- **ActorRef**: Immutable, lightweight proxy that decouples senders from the concrete actor type
-- **Command Pattern**: Built-in command implementation with result channels and error handling
-- **Ask Pattern**: Single-call request/response with timeout
-- **Actor System**: Name-based actor registry with Spawn convenience and event bus
-- **Supervision**: Supervisor with OneForOne/AllForOne restart strategies, death watch, and max restart frequency
-- **Behavior Change**: Dynamic handler switching via Become/Unbecome with BehaviorStack
-- **Actor Context**: Access actor identity and behavior operations during message processing
-- **Middleware**: Composable middleware chain for cross-cutting concerns (logging, metrics, recovery)
-- **Dead Letters**: Queue for capturing undeliverable messages
-- **Priority Mailbox**: Priority-based message ordering with configurable levels
-- **Signal Handling**: OS signal integration (SIGTERM/SIGINT) for graceful shutdown
-- **Context Support**: Full context.Context integration for cancellation and timeouts
-- **Panic Recovery**: Automatic panic recovery with configurable error handling
-- **Thread-Safe**: All operations are safe for concurrent use; tests run with `-race` detector
+- **Type-safe** — generics bind entities, commands, and refs at compile time
+- **Lightweight** — one actor is one goroutine plus a bounded channel
+- **ActorRef** — immutable proxy that exposes `Send`, `Stop`, `State`, and `Done`
+- **Command & Ask** — async commands with result channels, or a single-call request/response
+- **Actor System** — name registry, `Spawn`, typed `Send`/`Ask` by name, event bus, LIFO shutdown
+- **Supervision** — OneForOne / AllForOne restarts, death watch, restart-frequency limits
+- **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
+- **Middleware** — composable logging, metrics, and panic recovery (`log/slog`)
+- **Dead letters** — queue for undeliverable messages with handlers
+- **Priority mailbox** — standalone `System` > `High` > `Normal` > `Low` queue (FIFO within a level)
+- **Signals** — SIGTERM / SIGINT graceful shutdown for systems and supervisors
+- **Panic recovery** — panics become errors; actors and commands stay isolated
+- **Race-tested** — the suite runs with the `-race` detector
 
-## Why Actor Model in Go?
+## Why an actor library in Go?
 
-Go already provides goroutines, channels, and `sync.Mutex` — so why add an actor abstraction on top?
+Go already has goroutines, channels, and `sync.Mutex`. This library is for the cases where those primitives are not enough on their own.
 
 ### Pros
 
-- **No locks, no data races by design.** Each actor owns its state exclusively. There is no shared mutable state to protect, so entire classes of concurrency bugs (deadlocks, forgotten mutexes, lock ordering issues) are eliminated at the structural level rather than by developer discipline.
-- **Predictable sequential execution.** Commands sent to an actor are processed one at a time in order. Complex state mutations become simple single-threaded logic — no need to reason about interleaving.
-- **Clear ownership boundaries.** The actor is the single source of truth for its entity. This makes it easy to reason about who can read or write a piece of state, even in large codebases.
-- **Structured lifecycle.** Built-in start/stop/hooks give you a consistent way to manage resource setup and teardown across many concurrent components, avoiding leaked goroutines and orphaned resources.
-- **Natural backpressure.** Bounded input channels signal when a component is overloaded, letting the system push back rather than silently growing unbounded queues.
-- **Fault isolation.** A panic in one actor is recovered and contained — it doesn't bring down the entire application or corrupt unrelated state. Supervisors can automatically restart failed actors.
+- **No locks, no data races by design.** Each actor owns its state. There is no shared mutable state to protect, so deadlocks, forgotten mutexes, and lock-ordering bugs are structural impossibilities rather than discipline problems.
+- **Predictable sequential execution.** Commands are processed one at a time. Complex mutations stay single-threaded.
+- **Clear ownership.** The actor is the single source of truth for its entity.
+- **Structured lifecycle.** Start / stop / hooks give a consistent way to set up and tear down many concurrent components.
+- **Natural backpressure.** Bounded input channels signal overload instead of growing without limit.
+- **Fault isolation.** A panic in one actor is recovered and contained. Supervisors can restart failed children.
 
 ### Cons
 
-- **Overhead for trivial concurrency.** If you just need a goroutine-safe counter or a simple fan-out, a `sync.Mutex` or a bare channel is lighter and more idiomatic.
-- **Latency from message passing.** Every interaction goes through a channel send and sequential processing. For hot paths that need sub-microsecond shared reads, a `sync.RWMutex` or `sync/atomic` will be faster.
-- **Debugging indirection.** Stack traces stop at channel operations. Tracing a request across multiple actors requires correlation IDs or structured logging — the call chain is no longer visible in a single stack.
+- **Overhead for trivial concurrency.** A `sync.Mutex` or a bare channel is lighter for a counter or a simple fan-out.
+- **Latency from message passing.** Every interaction is a channel send plus sequential processing. Hot shared reads are faster with `sync.RWMutex` or `sync/atomic`.
+- **Debugging indirection.** Stack traces stop at channel operations. Cross-actor requests need correlation IDs or structured logs.
 
 ### When to use
 
 - Long-lived stateful components (connection managers, session stores, caches, worker coordinators)
-- State that multiple goroutines need to read and mutate, where getting the locking right is error-prone
-- Systems where you need structured lifecycle management (graceful startup ordering, coordinated shutdown)
-- Domains that naturally decompose into independent entities (game objects, device controllers, per-user/per-tenant state)
+- State that many goroutines must read and mutate, where locking is error-prone
+- Systems that need ordered startup and coordinated shutdown
+- Domains that decompose into independent entities (sessions, devices, per-tenant state)
 
 ### When not to use
 
-- Simple request-scoped concurrency — a `sync.WaitGroup` or `errgroup` is sufficient
-- Read-heavy, write-rare shared state — `sync.RWMutex` or `atomic.Value` avoids unnecessary serialization
-- Fire-and-forget work — a plain goroutine with a channel is simpler
-- CPU-bound parallelism (data processing pipelines) — use worker pools and fan-out/fan-in instead
+- Request-scoped concurrency — `sync.WaitGroup` or `errgroup` is enough
+- Read-heavy, write-rare shared state — `sync.RWMutex` or `atomic.Value`
+- Fire-and-forget work — a goroutine and a channel
+- CPU-bound pipelines — worker pools and fan-out / fan-in
 
-## Quick Start By Examples
+## Installation
 
-### 1. Define Your Entity
-
-```go
-type Counter struct {
-    Value int
-}
-
-func (c *Counter) IsProvidable() bool {
-    return true // Entity is ready for use
-}
+```bash
+go get github.com/barnowlsnest/go-actorlib/v4
 ```
 
-### 2. Create a Provider
+Requires **Go 1.27** or later.
+
+## Quick start
+
+Define an entity, start an actor, and ask it a question:
 
 ```go
-type CounterProvider struct {
-    counter *Counter
-}
+package main
 
-func (p *CounterProvider) Provide() *Counter {
-    return p.counter
-}
-```
-
-### 3. Create and Start an Actor
-
-The simplest way to create, start, and obtain a reference:
-
-```go
 import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
     "github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
     "github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
+    "github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
 )
 
-ctx := context.Background()
+type Counter struct{ Value int }
 
-// StartNew combines New + Start + WaitReady
-myActor, err := actor.StartNew(ctx, 5*time.Second,
-    actor.WithProvider(&CounterProvider{&Counter{}}),
-    actor.WithInputBufferSize[*Counter](10),
-    actor.WithReceiveTimeout[*Counter](5*time.Second),
-    actor.WithName[*Counter]("counter"),
-)
-if err != nil {
-    log.Fatal(err)
+func (c *Counter) IsProvidable() bool { return true }
+
+type CounterProvider struct{ counter *Counter }
+
+func (p *CounterProvider) Provide() *Counter { return p.counter }
+
+func main() {
+    ctx := context.Background()
+
+    a, err := actor.StartNew(ctx, 5*time.Second,
+        actor.WithProvider(&CounterProvider{&Counter{}}),
+        actor.WithName[*Counter]("counter"),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    ref, err := actorref.New(a)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer ref.Stop(5 * time.Second)
+
+    n, err := ask.New(ctx, ref, func(c *Counter) (int, error) {
+        c.Value++
+        return c.Value, nil
+    }, 5*time.Second)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(n) // 1
 }
+```
 
+Defaults: input buffer size `1`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`).
+
+### ActorRef
+
+`Ref` decouples the lifecycle owner from senders. Callers get `Send`, `Stop`, `State`, and `Done` — not `Start`, `WaitReady`, or internals. Multiple refs may point at the same actor.
+
+```go
 ref, err := actorref.New(myActor)
 if err != nil {
     log.Fatal(err)
 }
+
+svc := NewOrderService(ref) // can send; cannot start or restart
 ```
 
-Or use the step-by-step approach for more control:
+### Commands
+
+```go
+cmd := command.New(func(counter *Counter) (int, error) {
+    counter.Value++
+    return counter.Value, nil
+})
+
+if err := ref.Send(ctx, cmd); err != nil {
+    return err
+}
+
+result, ok := <-cmd.Done()
+if !ok {
+    return cmd.Error()
+}
+fmt.Printf("Counter value: %d\n", result)
+return cmd.Error()
+```
+
+### Ask (request / response with timeout)
+
+```go
+result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
+    counter.Value++
+    return counter.Value, nil
+}, 5*time.Second)
+```
+
+`ask.ErrAskTimeout` is returned when the timeout elapses before a result arrives.
+
+### Manual lifecycle
+
+`StartNew` is `New` + `Start` + `WaitReady`. The step-by-step form is useful when you need hooks between those calls:
 
 ```go
 myActor, err := actor.New(
@@ -120,7 +180,6 @@ myActor, err := actor.New(
 if err != nil {
     log.Fatal(err)
 }
-
 if err := myActor.Start(ctx); err != nil {
     log.Fatal(err)
 }
@@ -129,76 +188,15 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 }
 ```
 
-### 4. Create an ActorRef and Hand It Out
+### Actor system
 
-`ActorRef` decouples the **lifecycle owner** (who creates and starts the actor) from **senders** (who only need to send messages). The ref exposes only `Send`, `Stop`, `State`, and `Done` — callers cannot call `Start`, `WaitReady`, or access internals.
+`Spawn` is `New` + `Start` + `WaitReady` + `actorref.New` + `Register`. It applies `WithName` from the registry name. Failed registration stops the actor so nothing is left running unregistered.
 
-```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
-
-ref, err := actorref.New(myActor)
-if err != nil {
-    log.Fatal(err)
-}
-
-// Pass ref to other components — they can send messages but cannot
-// start, restart, or access lifecycle internals
-svc := NewOrderService(ref)
-```
-
-### 5. Send Commands via Ref
-
-Callers receive an `*actorref.Ref[T]` and interact with the actor through it:
+`Register`, `Send`, and `Ask` are generic free functions.
 
 ```go
-func (s *OrderService) PlaceOrder(ctx context.Context) error {
-    cmd := command.New(func(counter *Counter) (int, error) {
-        counter.Value++
-        return counter.Value, nil
-    })
-
-    if err := s.ref.Send(ctx, cmd); err != nil {
-        return err
-    }
-
-    result, ok := <-cmd.Done()
-    if !ok {
-        return cmd.Error()
-    }
-    fmt.Printf("Counter value: %d\n", result)
-    return cmd.Error()
-}
-```
-
-### 6. Ask Pattern (Request/Response with Timeout)
-
-The `ask` package collapses command creation, sending, waiting, and error checking into a single call. It accepts an `*actorref.Ref[E]`:
-
-```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
-
-result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
-    counter.Value++
-    return counter.Value, nil
-}, 5*time.Second)
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("Counter value: %d\n", result)
-```
-
-### 7. Actor System (Registry and Spawn)
-
-The `system` package provides a name-based registry with a `Spawn` convenience that combines actor creation, startup, and registration:
-
-```go
-import (
-    "github.com/barnowlsnest/go-actorlib/v4/pkg/system"
-)
-
 sys := system.New()
 
-// Spawn: New + Start + WaitReady + Ref + Register in one call
 ref, err := system.Spawn(sys, ctx, "counter-1",
     &CounterProvider{&Counter{}},
     5*time.Second,
@@ -208,31 +206,27 @@ if err != nil {
     log.Fatal(err)
 }
 
-// Send commands by name
-system.Send(sys, ctx, "counter-1", cmd)
+_ = system.Send(sys, ctx, "counter-1", cmd)
 
-// Ask by name with timeout
 result, err := system.Ask(sys, ctx, "counter-1", func(c *Counter) (int, error) {
     c.Value++
     return c.Value, nil
 }, 5*time.Second)
 
-// Event bus — observe actor lifecycle
 sys.OnEvent(func(e system.Event) {
     fmt.Printf("event: %v actor: %s\n", e.Kind, e.ActorName)
 })
 
-// Graceful LIFO shutdown
-sys.StopAll(10 * time.Second)
+sys.StopAll(10 * time.Second) // LIFO, then the system is stopped
 ```
 
-### 8. Supervision
+Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
-The `supervision` package monitors child actors and restarts them on failure:
+### Supervision
+
+Default policy: OneForOne, max 3 restarts within 5 seconds. Clean `Done` stops are not restarted.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/supervision"
-
 sup := supervision.NewSupervisor(
     supervision.WithPolicy(supervision.RestartPolicy{
         Strategy:       supervision.OneForOne, // or AllForOne
@@ -241,19 +235,21 @@ sup := supervision.NewSupervisor(
     }),
 )
 
-sup.Add("worker-1", &MyChildSpec{})
-sup.Add("worker-2", &MyChildSpec{})
+if err := sup.Add("worker-1", &MyChildSpec{}); err != nil {
+    log.Fatal(err)
+}
 
-// Death watch — observe child terminations
 sup.Watch(func(name string, state uint64) {
     fmt.Printf("child %s terminated with state %d\n", name, state)
 })
 
-sup.StartAll(ctx, 5*time.Second)
+if err := sup.StartAll(ctx, 5*time.Second); err != nil {
+    log.Fatal(err)
+}
 defer sup.StopAll(10 * time.Second)
 ```
 
-`ChildSpec` is an interface you implement to define how children are created:
+`ChildSpec` is the factory; `actorref.Ref` already implements `ChildRef`:
 
 ```go
 type MyChildSpec struct{}
@@ -269,58 +265,45 @@ func (s *MyChildSpec) Start(ctx context.Context) (supervision.ChildRef, error) {
 }
 ```
 
-### 9. Behavior Change (Become/Unbecome)
-
-Actors can dynamically switch their message handling logic at runtime via `GoActorContext`:
+### Behavior change
 
 ```go
 func initialHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-
-    // Switch to a different behavior
-    actorCtx := actor.GetGoActorContext[*MyEntity](ctx)
-    actorCtx.Become(authenticatedHandler)
+    actor.GetGoActorContext[*MyEntity](ctx).Become(authenticatedHandler)
 }
 
 func authenticatedHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-
-    // Revert to previous behavior
-    actorCtx := actor.GetGoActorContext[*MyEntity](ctx)
-    actorCtx.Unbecome()
+    actor.GetGoActorContext[*MyEntity](ctx).Unbecome()
 }
 ```
 
-### 10. Middleware
+`GoActorContext` is valid only while the current message is processed. `Unbecome` will not pop the base handler.
 
-Add cross-cutting concerns to actor message processing with composable middleware:
+### Middleware
+
+Place `Recovery` first if you want panics caught before they put the actor in `Panicked`. The chain is composed once at `Start`.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/middleware"
-
 metrics := &middleware.Metrics{}
 
 myActor, err := actor.StartNew(ctx, 5*time.Second,
     actor.WithProvider(provider),
     actor.WithName[*Counter]("counter"),
     actor.WithMiddleware(
-        middleware.Recovery[*Counter](slog.Default()),       // catch panics
-        middleware.Logging[*Counter](slog.Default()),        // log messages
-        middleware.MetricsMiddleware[*Counter](metrics),     // collect stats
+        middleware.Recovery[*Counter](slog.Default()),
+        middleware.Logging[*Counter](slog.Default()),
+        middleware.MetricsMiddleware[*Counter](metrics),
     ),
 )
-
-// Query metrics concurrently
-fmt.Printf("processed: %d, avg: %s\n", metrics.MessageCount(), metrics.AverageDuration())
 ```
 
-### 11. Dead Letters
+### Dead letters
 
-Capture undeliverable messages for debugging and monitoring:
+The queue is opt-in: publish undeliverable messages yourself (for example from a send-error path). Default capacity is 1000; the oldest letter is dropped when full.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/deadletter"
-
 dlq := deadletter.New(deadletter.WithCapacity(1000))
 
 dlq.OnDeadLetter(func(l deadletter.Letter) {
@@ -330,94 +313,103 @@ dlq.OnDeadLetter(func(l deadletter.Letter) {
 dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: "actor stopped"})
 ```
 
-### 12. Graceful Shutdown with OS Signals
+### OS signals
+
+`AwaitShutdown` works with anything that implements `StopAll` — both `ActorSystem` and `Supervisor`.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/signal"
-
-// Block until SIGTERM/SIGINT, then stop the system
 err := signal.AwaitShutdown(ctx, sys, 10*time.Second)
 
-// Or handle manually
 notify, stop := signal.NotifyShutdown()
 defer stop()
 <-notify
 sys.StopAll(10 * time.Second)
 ```
 
-### 13. Priority Mailbox
+### Priority mailbox
 
-Messages with higher priority are processed first:
+`PriorityMailbox` is a standalone heap. The actor's built-in mailbox is a bounded Go channel; this type is not plugged in automatically.
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v4/pkg/mailbox"
-
 mb := mailbox.NewPriority[*MyEntity](100)
 
 mb.Push(normalCmd, mailbox.Normal)
-mb.Push(systemCmd, mailbox.System)  // processed first
-mb.Push(lowCmd, mailbox.Low)        // processed last
+mb.Push(systemCmd, mailbox.System) // processed first
+mb.Push(lowCmd, mailbox.Low)
 
-msg, ok := mb.Pop() // returns systemCmd
+msg, ok := mb.Pop() // systemCmd
 ```
 
-Priority levels (highest to lowest): `System` > `High` > `Normal` > `Low`. FIFO order is maintained within the same priority.
+Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within the same level. `Push` returns `false` when the mailbox is full or closed.
 
 ## Packages
 
-| Package           | Description                                                                                         |
-|-------------------|-----------------------------------------------------------------------------------------------------|
-| `pkg/actor`       | Core actor: GoActor, Entity, Executable, Hooks, BehaviorStack, GoActorContext, Middleware, StartNew |
-| `pkg/actorref`    | Typed actor handle: Ref with Send, Stop, State, Done                                                |
-| `pkg/command`     | Command pattern: GoCommand with DelegateFn and result channels                                      |
-| `pkg/ask`         | Request/response convenience with timeout                                                           |
-| `pkg/system`      | Actor system: name registry, Spawn, event bus, Send/Ask by name                                     |
-| `pkg/supervision` | Supervisor: OneForOne/AllForOne, ChildSpec, death watch, restart policy                             |
-| `pkg/middleware`  | Reference middleware: Logging (slog), Metrics (atomic), Recovery (panic)                            |
-| `pkg/deadletter`  | Dead letter queue with capacity and handlers                                                        |
-| `pkg/signal`      | OS signal integration: AwaitShutdown, NotifyShutdown                                                |
-| `pkg/mailbox`     | Priority mailbox with System/High/Normal/Low levels                                                 |
+| Package | Description |
+|---|---|
+| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/actor) | `GoActor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
+| [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/actorref) | Typed `Ref`: `Send`, `Stop`, `State`, `Done` |
+| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/command) | `GoCommand` with `DelegateFn` and a result channel |
+| [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/ask) | Request/response with timeout |
+| [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/system) | Name registry, `Spawn`, `Register`/`Send`/`Ask`, event bus |
+| [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
+| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/middleware) | Logging (`slog`), Metrics (atomic), Recovery |
+| [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/deadletter) | Dead-letter queue with capacity and handlers |
+| [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
+| [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/mailbox) | Standalone priority mailbox |
 
-## Architecture
+PlantUML diagrams: [`docs/`](./docs/README.md).
 
-PlantUML diagrams documenting the architecture are available in [`docs/`](./docs/README.md).
+## Performance notes
 
-## Performance Considerations
+- Tune input buffer size to your message volume; the default is `1`.
+- Set receive timeouts for backpressure; `0` means wait until `ctx` is done.
+- Always `Stop` actors (or `StopAll` on the system / supervisor) to avoid leaked goroutines.
+- Middleware is composed once at startup — no per-message allocation from the chain itself.
+- Restart-frequency limits on supervisors prevent restart storms.
 
-- **Buffer Sizes**: Tune input buffer sizes based on message volume
-- **Timeouts**: Configure appropriate timeouts for your use case
-- **Resource Cleanup**: Always stop actors to prevent goroutine leaks
-- **Middleware**: Middleware chain is composed once at startup — zero per-message allocation overhead
-- **Supervision**: Restart frequency limits prevent restart storms from consuming resources
+## Development
 
-## Development Commands
-
-This project uses [Task](https://taskfile.dev/) for build automation:
+Build automation uses [Task](https://taskfile.dev/):
 
 ```bash
-# Install Task
 go install github.com/go-task/task/v3/cmd/task@latest
 
-# Essential commands
-task sanity       # Run all checks (tidy, fmt, lint, build, vet, test)
-task go-build     # Build all packages
-task go-test      # Run tests with coverage, benchmarks, and -race
-task go-lint      # Run golangci-lint
-task go-fmt       # Format all Go files
-task go-vet       # Run static analysis
-task go-tidy      # go mod tidy
+task sanity        # tidy, fmt, lint --fix, build, vet, test
+task go-build      # go build ./...
+task go-test       # tests with -race, coverage, and benchmarks
+task go-lint-fix   # golangci-lint run --fix
+task go-fmt        # go fmt ./...
+task go-vet        # go vet ./...
+task go-tidy       # go mod tidy
 ```
 
-## Requirements
+CI on `main` (push and pull request) runs build/test and [golangci-lint](https://golangci-lint.run/) v2.
 
-- Go 1.26.1 or later
-- Dependencies: [go-datalib](https://github.com/barnowlsnest/go-datalib) (Heap for priority mailbox), testify (tests only)
+Fuzz tests:
+
+```bash
+go test -fuzz FuzzActorLifecycle -fuzztime 5s ./pkg/actor/
+go test -fuzz FuzzConcurrentStopAndSend -fuzztime 5s ./pkg/actor/
+```
+
+Runtime dependency: [go-datalib](https://github.com/barnowlsnest/go-datalib) (heap for the priority mailbox). [testify](https://github.com/stretchr/testify) is test-only.
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+1. Open an issue first for larger design changes.
+2. Keep PRs focused; match existing style and the `TestX_Condition_ShouldY` test names.
+3. `task sanity` must pass locally (includes `-race` tests and lint).
+
+Please do not commit generated coverage files or editor config (see `.gitignore`).
 
 ## License
 
-This project is licensed under the terms specified in the LICENSE file.
+[MIT](LICENSE) © 2025 Barn Owls Nest
 
 ## References
 
-- [Actor Model](https://en.wikipedia.org/wiki/Actor_model) - Learn about the Actor Model pattern
-- [Go Concurrency Patterns](https://go.dev/blog/pipelines) - Go concurrency best practices
+- [Actor Model](https://en.wikipedia.org/wiki/Actor_model)
+- [Go concurrency patterns](https://go.dev/blog/pipelines)
+- [pkg.go.dev documentation](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4)
