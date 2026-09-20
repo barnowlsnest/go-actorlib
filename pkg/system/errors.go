@@ -3,7 +3,7 @@ package system
 import (
 	"errors"
 
-	"github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
+	"github.com/barnowlsnest/go-actorlib/v5/pkg/ask"
 )
 
 // ErrSystemStopped is returned when attempting to perform operations on a stopped actor system.
