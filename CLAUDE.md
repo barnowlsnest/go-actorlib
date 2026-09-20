@@ -96,9 +96,9 @@ Ten packages under `pkg/`.
 
 ### `pkg/middleware` — Reference middleware implementations
 
-- **`Logging`** — `slog` debug logs around each message, with duration and actor name from context.
+- **`Logging`** — `go-logslib` debug logs around each message, with duration and actor name from context.
 - **`Metrics` / `MetricsMiddleware`** — Atomic counters via methods `MessageCount`, `TotalDuration`, `AverageDuration`.
-- **`Recovery`** — Catches panics in downstream handlers, logs at error, prevents actor `Panicked`. Place **first** in the chain to wrap everything else.
+- **`Recovery`** — Catches panics in downstream handlers, logs at error via `go-logslib`, prevents actor `Panicked`. Place **first** in the chain to wrap everything else.
 
 ### `pkg/deadletter` — Dead letter queue
 
@@ -121,6 +121,7 @@ Ten packages under `pkg/`.
 ### Dependencies
 
 - **go-datalib** (`github.com/barnowlsnest/go-datalib/v5`) — Heap for priority mailbox.
+- **go-logslib** (`github.com/barnowlsnest/go-logslib/v2`) — Structured logging for Logging and Recovery middleware.
 - **testify** — Test assertions and suites (test-only).
 
 ### PlantUML diagrams

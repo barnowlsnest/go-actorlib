@@ -6,22 +6,24 @@ package middleware
 
 import (
 	"context"
-	"log/slog"
 	"time"
+
+	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
 // Logging returns a middleware that logs each message processed by an actor.
-// It logs the start and completion (or error) of each message execution with duration.
+// It logs the start and completion of each message execution with duration.
 //
 // Usage:
 //
+//	log := logger.New(logger.Config{Level: logger.DebugLevel})
 //	actor.New(
 //		actor.WithProvider(provider),
-//		actor.WithMiddleware(middleware.Logging[*MyEntity](slog.Default())),
+//		actor.WithMiddleware(middleware.Logging[*MyEntity](log)),
 //	)
-func Logging[T actor.Entity](logger *slog.Logger) actor.Middleware[T] {
+func Logging[T actor.Entity](log *logger.Logger) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
 		return func(ctx context.Context, e actor.Executable[T], entity T) {
 			actorName := ""
@@ -29,17 +31,18 @@ func Logging[T actor.Entity](logger *slog.Logger) actor.Middleware[T] {
 				actorName = ac.Name()
 			}
 
-			logger.LogAttrs(ctx, slog.LevelDebug, "actor processing message",
-				slog.String("actor", actorName),
+			ctxLog := log.WithContext(ctx)
+			ctxLog.Debug("actor processing message",
+				logger.StringField("actor", actorName),
 			)
 
 			start := time.Now()
 			next(ctx, e, entity)
 			duration := time.Since(start)
 
-			logger.LogAttrs(ctx, slog.LevelDebug, "actor processed message",
-				slog.String("actor", actorName),
-				slog.Duration("duration", duration),
+			ctxLog.Debug("actor processed message",
+				logger.StringField("actor", actorName),
+				logger.DurationField("duration", duration),
 			)
 		}
 	}

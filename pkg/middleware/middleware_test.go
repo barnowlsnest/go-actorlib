@@ -2,12 +2,12 @@ package middleware
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
@@ -91,11 +91,15 @@ func TestMiddlewareTestSuite(t *testing.T) {
 func (s *MiddlewareTestSuite) TestLogging_ShouldLogMessages() {
 	// Arrange
 	buf := &safeBuffer{}
-	logger := slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log := logger.New(logger.Config{
+		Level:  logger.DebugLevel,
+		Format: logger.TextFormat,
+		Output: buf,
+	})
 
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithMiddleware(Logging[*testEntity](logger)),
+		actor.WithMiddleware(Logging[*testEntity](log)),
 		actor.WithName[*testEntity]("test-actor"),
 	)
 	s.Require().NoError(err)
@@ -161,11 +165,15 @@ func (s *MiddlewareTestSuite) TestMetrics_NoMessages_ShouldReturnZero() {
 func (s *MiddlewareTestSuite) TestRecovery_ShouldCatchPanic() {
 	// Arrange
 	buf := &safeBuffer{}
-	logger := slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log := logger.New(logger.Config{
+		Level:  logger.DebugLevel,
+		Format: logger.TextFormat,
+		Output: buf,
+	})
 
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithMiddleware(Recovery[*testEntity](logger)),
+		actor.WithMiddleware(Recovery[*testEntity](log)),
 		actor.WithName[*testEntity]("panic-actor"),
 	)
 	s.Require().NoError(err)

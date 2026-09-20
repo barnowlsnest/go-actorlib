@@ -17,7 +17,7 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 - **Actor System** — name registry, `Spawn`, typed `Send`/`Ask`, event bus, LIFO shutdown
 - **Supervision** — OneForOne / AllForOne, death watch, restart-frequency limits
 - **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
-- **Middleware** — logging, metrics, and panic recovery (`log/slog`)
+- **Middleware** — logging, metrics, and panic recovery (`go-logslib`)
 - **Dead letters** — queue for undeliverable messages with handlers
 - **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `GoActor`)
 - **Signals** — SIGTERM / SIGINT graceful shutdown
@@ -262,13 +262,14 @@ Place `Recovery` first if you want panics caught before they put the actor in `P
 
 ```go
 metrics := &middleware.Metrics{}
+log := logger.New(logger.Config{Level: logger.DebugLevel})
 
 myActor, err := actor.StartNew(ctx, 5*time.Second,
     actor.WithProvider(provider),
     actor.WithName[*Counter]("counter"),
     actor.WithMiddleware(
-        middleware.Recovery[*Counter](slog.Default()),
-        middleware.Logging[*Counter](slog.Default()),
+        middleware.Recovery[*Counter](log),
+        middleware.Logging[*Counter](log),
         middleware.MetricsMiddleware[*Counter](metrics),
     ),
 )
@@ -325,7 +326,7 @@ msg, ok := mb.Pop() // systemCmd
 | [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/ask) | Request/response with timeout |
 | [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/system) | Name registry, `Spawn`, `Register`/`Send`/`Ask`, event bus |
 | [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
-| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/middleware) | Logging (`slog`), Metrics (atomic), Recovery |
+| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
 | [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/deadletter) | Dead-letter queue with capacity and handlers |
 | [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
 | [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/mailbox) | Standalone priority mailbox |
