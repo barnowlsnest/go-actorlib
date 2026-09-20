@@ -34,7 +34,7 @@ go test -fuzz FuzzConcurrentStopAndSend -fuzztime 5s ./pkg/actor/
 
 ## Architecture
 
-Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel. `pkg/mailbox` is a standalone heap and is **not** wired into `GoActor.Receive`.
+Ten packages under `pkg/`.
 
 ### `pkg/actor` — Core actor implementation
 
@@ -49,7 +49,7 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
 - **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown.
-- **Receive** rejects nil commands and any state after Started (`state > 1`). Timeout `0` skips the timer and still honors `ctx`.
+- **Receive** rejects nil commands and any state after Started (`state > 1`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
 - Defaults: `inputBufSize = 1`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
 - Also: `Name()`, `Done()`, `InputBufferSize()`, `CheckState`, `State`.
@@ -94,7 +94,7 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 ### `pkg/middleware` — Reference middleware implementations
 
 - **`Logging`** — `slog` debug logs around each message, with duration and actor name from context.
-- **`Metrics` / `MetricsMiddleware`** — Atomic counters: `MessageCount`, `TotalDuration`, `AverageDuration`.
+- **`Metrics` / `MetricsMiddleware`** — Atomic counters via methods `MessageCount`, `TotalDuration`, `AverageDuration`.
 - **`Recovery`** — Catches panics in downstream handlers, logs at error, prevents actor `Panicked`. Place **first** in the chain to wrap everything else.
 
 ### `pkg/deadletter` — Dead letter queue
@@ -111,26 +111,9 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 
 ### `pkg/mailbox` — Alternative mailbox implementations
 
-- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not used by `GoActor`.
+- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `GoActor.Receive` (actor mailbox is a bounded channel).
 - Priority: `System` > `High` > `Normal` > `Low` (iota; lower value = higher priority). FIFO via insertion `seq` within the same priority.
 - **`Push`** returns false if full (`maxSize > 0`) or closed. **`Pop`**, **`Notify`** (buffered 1, non-blocking signal), **`Size`**, **`Close`**, **`IsEmpty`**.
-
-### Design patterns
-
-- **Actor Model**: Isolated actors with exclusive state access, async communication via `Executable` commands.
-- **Command Pattern**: `GoCommand` wraps operations as objects; actors execute them, entities process them.
-- **Observer Pattern**: `Hooks` and the system event bus.
-- **Behavior Pattern**: `BehaviorStack` via `Become` / `Unbecome`.
-- **Supervision Pattern**: Supervisor with restart policies and death watch.
-- **Proxy Pattern**: `Ref` hides lifecycle internals.
-- **Chain of Responsibility**: Middleware pipeline.
-
-### Concurrency model
-
-- One actor = one goroutine. Bounded channels provide backpressure.
-- Stop uses atomic CAS; a dedicated stop channel avoids Receive/Stop races.
-- Configurable receive timeouts; `ErrActorReceiveTimeout` when the buffer is full.
-- All tests run with `-race`.
 
 ### Dependencies
 
@@ -139,7 +122,7 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 
 ### PlantUML diagrams
 
-Available in [`docs/`](./docs/README.md): architecture overview, component relationships, actor lifecycle, command flow, message passing, supervision, behavior change, system lifecycle.
+[`docs/`](./docs/README.md).
 
 ### Typical usage flow
 
@@ -158,4 +141,4 @@ Available in [`docs/`](./docs/README.md): architecture overview, component relat
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`.
 - Test naming convention: `TestX_Condition_ShouldY` (behavior-driven).
-- Linting: golangci-lint **v2**, 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
+- Linting: golangci-lint **v2.13** (CI), 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
