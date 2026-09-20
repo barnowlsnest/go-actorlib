@@ -9,13 +9,12 @@ import (
 )
 
 // Spawn creates, starts, and registers an actor in the system in one operation.
-// It combines actor.New, actor.Start, actor.WaitReady, actorref.New, and Register
-// into a single convenience function.
+// It combines [actor.StartNew], [actorref.New], and [Register].
 //
 // The actor is configured with WithName automatically using the provided name.
 //
 // Returns the actor reference or an error if any step fails.
-// On failure, the system state is unchanged (no partial registration).
+// On registration failure, the actor is stopped so the system state is unchanged.
 func Spawn[T actor.Entity](
 	s *ActorSystem,
 	ctx context.Context,
@@ -28,31 +27,22 @@ func Spawn[T actor.Entity](
 	allOpts = append(allOpts, actor.WithProvider(provider), actor.WithName[T](name))
 	allOpts = append(allOpts, opts...)
 
-	a, err := actor.New(allOpts...)
+	a, err := actor.StartNew(ctx, readyTimeout, allOpts...)
 	if err != nil {
 		return nil, err
-	}
-
-	if startErr := a.Start(ctx); startErr != nil {
-		return nil, startErr
-	}
-
-	if readyErr := a.WaitReady(ctx, readyTimeout); readyErr != nil {
-		return nil, readyErr
 	}
 
 	ref, err := actorref.New(a)
 	if err != nil {
+		_ = a.Stop(readyTimeout)
 		return nil, err
 	}
 
 	if regErr := Register(s, name, ref); regErr != nil {
-		// Best effort: stop the actor since we can't register it
 		_ = ref.Stop(readyTimeout)
 		return nil, regErr
 	}
 
-	// Emit event
 	s.emitEvent(Event{Kind: EventActorStarted, ActorName: name})
 
 	return ref, nil

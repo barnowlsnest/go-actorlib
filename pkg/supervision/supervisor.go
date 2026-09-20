@@ -165,8 +165,15 @@ func (s *Supervisor) StartAll(ctx context.Context, readyTimeout time.Duration) e
 	return nil
 }
 
-func (s *Supervisor) startChild(ctx context.Context, c *child, _ time.Duration) error {
-	ref, err := c.spec.Start(ctx)
+func (s *Supervisor) startChild(ctx context.Context, c *child, readyTimeout time.Duration) error {
+	startCtx := ctx
+	var cancel context.CancelFunc
+	if readyTimeout > 0 {
+		startCtx, cancel = context.WithTimeout(ctx, readyTimeout)
+		defer cancel()
+	}
+
+	ref, err := c.spec.Start(startCtx)
 	if err != nil {
 		return err
 	}
@@ -261,7 +268,7 @@ func (s *Supervisor) handleTermination(ctx context.Context, c *child) {
 }
 
 func (s *Supervisor) restartOne(ctx context.Context, c *child) {
-	if err := s.startChild(ctx, c, 5*time.Second); err != nil {
+	if err := s.startChild(ctx, c, s.stopTimeout); err != nil {
 		s.mu.Lock()
 		watchers := make([]WatchCallback, len(s.watchers))
 		copy(watchers, s.watchers)
@@ -292,7 +299,7 @@ func (s *Supervisor) restartAll(ctx context.Context) {
 
 	// Restart all children
 	for _, c := range children {
-		_ = s.startChild(ctx, c, 5*time.Second)
+		_ = s.startChild(ctx, c, s.stopTimeout)
 	}
 }
 

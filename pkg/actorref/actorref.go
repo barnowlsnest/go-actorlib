@@ -15,8 +15,8 @@ type Ref[T actor.Entity] struct {
 	actor *actor.GoActor[T]
 }
 
-// New creates an Ref handle for the given actor.
-// Returns an error if the actor is nil.
+// New creates a Ref for the given actor.
+// Returns ErrActorRefNilActor if a is nil.
 func New[T actor.Entity](a *actor.GoActor[T]) (*Ref[T], error) {
 	if a == nil {
 		return nil, ErrActorRefNilActor
@@ -25,14 +25,12 @@ func New[T actor.Entity](a *actor.GoActor[T]) (*Ref[T], error) {
 	return &Ref[T]{actor: a}, nil
 }
 
-// Send delivers a command to the actor for async processing.
-// It delegates to the underlying GoActor's Receive method.
+// Send queues a command on the referenced actor.
 func (r *Ref[T]) Send(ctx context.Context, cmd actor.Executable[T]) error {
 	return r.actor.Receive(ctx, cmd)
 }
 
 // Stop initiates graceful shutdown of the referenced actor.
-// It delegates to the underlying GoActor's Stop method.
 func (r *Ref[T]) Stop(timeout time.Duration) error {
 	return r.actor.Stop(timeout)
 }

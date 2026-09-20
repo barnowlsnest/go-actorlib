@@ -3,10 +3,6 @@ package supervision
 import "errors"
 
 var (
-	// ErrMaxRestartsExceeded is returned when the supervisor has exceeded the maximum
-	// number of restarts within the configured time window.
-	ErrMaxRestartsExceeded = errors.New("supervisor: max restarts exceeded within time window")
-
 	// ErrChildNotFound is returned when a child actor is not found in the supervisor.
 	ErrChildNotFound = errors.New("supervisor: child not found")
 

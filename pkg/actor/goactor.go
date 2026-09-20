@@ -39,7 +39,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -225,8 +224,9 @@ func (ga *GoActor[T]) State() uint64 {
 // the expected state. This is useful for ensuring state preconditions
 // before performing operations.
 func (ga *GoActor[T]) CheckState(state uint64) error {
-	if atomic.LoadUint64(&ga.state) != state {
-		return fmt.Errorf("actor state mismatch: expected %d, got %d", state, atomic.LoadUint64(&ga.state))
+	current := atomic.LoadUint64(&ga.state)
+	if current != state {
+		return fmt.Errorf("actor state mismatch: expected %d, got %d", state, current)
 	}
 	return nil
 }
@@ -236,10 +236,6 @@ func (ga *GoActor[T]) CheckState(state uint64) error {
 // This represents the maximum number of messages that can be queued
 // for processing before senders will block or timeout.
 func (ga *GoActor[T]) InputBufferSize() int {
-	if ga.inputBufSize > math.MaxInt {
-		return math.MaxInt
-	}
-
 	return ga.inputBufSize
 }
 
@@ -549,25 +545,9 @@ func (ga *GoActor[T]) catchPanic() {
 		atomic.StoreUint64(&ga.state, Panicked)
 		switch e := err.(type) {
 		case error:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				e,
-			))
-		case string:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("string panic: %s", e),
-			))
-		case int:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("int panic: %d", e),
-			))
+			ga.hooks.OnError(errors.Join(ErrActorPanic, e))
 		default:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("unknown panic type: %v", e),
-			))
+			ga.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", e)))
 		}
 	}
 }
