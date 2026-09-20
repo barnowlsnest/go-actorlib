@@ -359,7 +359,7 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 	// Check if the entity is nil using reflection
 	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
 	rv := reflect.ValueOf(entity)
-	if !rv.IsValid() || (rv.Kind() == reflect.Ptr && rv.IsNil()) {
+	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
 		return ErrActorNilEntity
 	}
 
