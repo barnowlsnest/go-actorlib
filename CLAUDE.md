@@ -120,7 +120,7 @@ Ten packages under `pkg/`.
 
 ### Dependencies
 
-- **go-datalib** (`github.com/barnowlsnest/go-datalib`) — Heap for priority mailbox.
+- **go-datalib** (`github.com/barnowlsnest/go-datalib/v5`) — Heap for priority mailbox.
 - **testify** — Test assertions and suites (test-only).
 
 ### PlantUML diagrams
