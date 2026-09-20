@@ -53,6 +53,17 @@ func New[E actor.Entity, R any](
 		return zero, err
 	}
 
+	return Await(ctx, cmd, timeout)
+}
+
+// Await waits for a command result until it completes, ctx is done, or timeout elapses.
+func Await[E actor.Entity, R any](
+	ctx context.Context,
+	cmd *command.GoCommand[E, R],
+	timeout time.Duration,
+) (R, error) {
+	var zero R
+
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 

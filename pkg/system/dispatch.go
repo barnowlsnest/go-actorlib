@@ -6,6 +6,7 @@ import (
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/command"
 )
 
@@ -55,6 +56,7 @@ func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd 
 //   - The timeout expires
 //
 // Returns the command result and nil on success, or the zero value of R and an error on failure.
+// Timeout errors are [ask.ErrAskTimeout] (also available as [ErrAskTimeout]).
 func Ask[T actor.Entity, R any](
 	s *ActorSystem,
 	ctx context.Context,
@@ -69,18 +71,5 @@ func Ask[T actor.Entity, R any](
 		return zero, err
 	}
 
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case result, ok := <-cmd.Done():
-		if !ok {
-			return zero, cmd.Error()
-		}
-		return result, cmd.Error()
-	case <-ctx.Done():
-		return zero, ctx.Err()
-	case <-timer.C:
-		return zero, ErrAskTimeout
-	}
+	return ask.Await(ctx, cmd, timeout)
 }

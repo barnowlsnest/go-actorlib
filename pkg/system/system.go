@@ -34,9 +34,6 @@ type ManagedActor interface {
 	State() uint64
 }
 
-// Option defines a function type for configuring an ActorSystem during creation.
-type Option func(*ActorSystem)
-
 // dispatchFn is a type-erased function for dispatching commands to an actor.
 // It accepts any command and performs the type assertion internally.
 type dispatchFn func(ctx context.Context, cmd any) error
@@ -59,17 +56,11 @@ type ActorSystem struct {
 	eventHandlers []EventHandler
 }
 
-// New creates a new ActorSystem with the specified options.
-func New(opts ...Option) *ActorSystem {
-	s := &ActorSystem{
+// New creates a new ActorSystem.
+func New() *ActorSystem {
+	return &ActorSystem{
 		actors: make(map[string]entry),
 	}
-
-	for _, opt := range opts {
-		opt(s)
-	}
-
-	return s
 }
 
 // register is the unexported method that stores the actor and its dispatch closure.

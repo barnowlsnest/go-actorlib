@@ -34,7 +34,7 @@ go test -fuzz FuzzConcurrentStopAndSend -fuzztime 5s ./pkg/actor/
 
 ## Architecture
 
-Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel. `pkg/mailbox` is a standalone heap and is **not** wired into `GoActor.Receive`.
+Ten packages under `pkg/`.
 
 ### `pkg/actor` — Core actor implementation
 
@@ -49,7 +49,7 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
 - **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown.
-- **Receive** rejects nil commands and any state after Started (`state > 1`). Timeout `0` skips the timer and still honors `ctx`.
+- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started (`ErrActorReceiveOnStopped`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
 - Defaults: `inputBufSize = 1`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
 - Also: `Name()`, `Done()`, `InputBufferSize()`, `CheckState`, `State`.
@@ -74,8 +74,9 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 ### `pkg/system` — Actor system with registry and lifecycle
 
 - **`ActorSystem`** — Flat name registry. Thread-safe. After `StopAll`, further ops return `ErrSystemStopped`.
+- **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
-- **`Spawn[T]`** — `actor.New` + `Start` + `WaitReady` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On register failure, stops the actor (best effort) so the system is unchanged.
+- **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
 
@@ -83,19 +84,21 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 
 - **`Supervisor`** — Monitors children and restarts on failure. Thread-safe.
 - **`ChildSpec`** — `Start(ctx) (ChildRef, error)`.
-- **`ChildRef`** — `Stop`, `State`, `Done`. `actorref.Ref` satisfies this.
+- **`ChildRef`** — `Stop`, `State`, `Done` (needed for death watch). `actorref.Ref` satisfies this. Broader than `system.ManagedActor`.
 - **Strategies**: `OneForOne` (restart only the failed child), `AllForOne` (stop+restart all). Clean `actor.Done` does **not** restart.
 - **`RestartPolicy`** — Strategy, `MaxRestarts` (0 = unlimited), `WithinDuration`. **`DefaultRestartPolicy()`**: OneForOne, max 3 within 5s.
-- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping siblings on AllForOne).
+- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
+- **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
+- **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
 
 ### `pkg/middleware` — Reference middleware implementations
 
-- **`Logging`** — `slog` debug logs around each message, with duration and actor name from context.
-- **`Metrics` / `MetricsMiddleware`** — Atomic counters: `MessageCount`, `TotalDuration`, `AverageDuration`.
-- **`Recovery`** — Catches panics in downstream handlers, logs at error, prevents actor `Panicked`. Place **first** in the chain to wrap everything else.
+- **`Logging`** — `go-logslib` debug logs around each message, with duration and actor name from context.
+- **`Metrics` / `MetricsMiddleware`** — Atomic counters via methods `MessageCount`, `TotalDuration`, `AverageDuration`.
+- **`Recovery`** — Catches panics in downstream handlers, logs at error via `go-logslib`, prevents actor `Panicked`. Place **first** in the chain to wrap everything else.
 
 ### `pkg/deadletter` — Dead letter queue
 
@@ -111,35 +114,19 @@ Ten packages under `pkg/`. The actor's built-in mailbox is a bounded Go channel.
 
 ### `pkg/mailbox` — Alternative mailbox implementations
 
-- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not used by `GoActor`.
+- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `GoActor.Receive` (actor mailbox is a bounded channel).
 - Priority: `System` > `High` > `Normal` > `Low` (iota; lower value = higher priority). FIFO via insertion `seq` within the same priority.
 - **`Push`** returns false if full (`maxSize > 0`) or closed. **`Pop`**, **`Notify`** (buffered 1, non-blocking signal), **`Size`**, **`Close`**, **`IsEmpty`**.
 
-### Design patterns
-
-- **Actor Model**: Isolated actors with exclusive state access, async communication via `Executable` commands.
-- **Command Pattern**: `GoCommand` wraps operations as objects; actors execute them, entities process them.
-- **Observer Pattern**: `Hooks` and the system event bus.
-- **Behavior Pattern**: `BehaviorStack` via `Become` / `Unbecome`.
-- **Supervision Pattern**: Supervisor with restart policies and death watch.
-- **Proxy Pattern**: `Ref` hides lifecycle internals.
-- **Chain of Responsibility**: Middleware pipeline.
-
-### Concurrency model
-
-- One actor = one goroutine. Bounded channels provide backpressure.
-- Stop uses atomic CAS; a dedicated stop channel avoids Receive/Stop races.
-- Configurable receive timeouts; `ErrActorReceiveTimeout` when the buffer is full.
-- All tests run with `-race`.
-
 ### Dependencies
 
-- **go-datalib** (`github.com/barnowlsnest/go-datalib`) — Heap for priority mailbox.
+- **go-datalib** (`github.com/barnowlsnest/go-datalib/v5`) — Heap for priority mailbox.
+- **go-logslib** (`github.com/barnowlsnest/go-logslib/v2`) — Structured logging for Logging and Recovery middleware.
 - **testify** — Test assertions and suites (test-only).
 
 ### PlantUML diagrams
 
-Available in [`docs/`](./docs/README.md): architecture overview, component relationships, actor lifecycle, command flow, message passing, supervision, behavior change, system lifecycle.
+[`docs/`](./docs/README.md).
 
 ### Typical usage flow
 
@@ -158,4 +145,4 @@ Available in [`docs/`](./docs/README.md): architecture overview, component relat
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`.
 - Test naming convention: `TestX_Condition_ShouldY` (behavior-driven).
-- Linting: golangci-lint **v2**, 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
+- Linting: golangci-lint **v2.13** (CI), 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).

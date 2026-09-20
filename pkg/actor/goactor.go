@@ -39,7 +39,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -225,8 +224,9 @@ func (ga *GoActor[T]) State() uint64 {
 // the expected state. This is useful for ensuring state preconditions
 // before performing operations.
 func (ga *GoActor[T]) CheckState(state uint64) error {
-	if atomic.LoadUint64(&ga.state) != state {
-		return fmt.Errorf("actor state mismatch: expected %d, got %d", state, atomic.LoadUint64(&ga.state))
+	current := atomic.LoadUint64(&ga.state)
+	if current != state {
+		return fmt.Errorf("actor state mismatch: expected %d, got %d", state, current)
 	}
 	return nil
 }
@@ -236,10 +236,6 @@ func (ga *GoActor[T]) CheckState(state uint64) error {
 // This represents the maximum number of messages that can be queued
 // for processing before senders will block or timeout.
 func (ga *GoActor[T]) InputBufferSize() int {
-	if ga.inputBufSize > math.MaxInt {
-		return math.MaxInt
-	}
-
 	return ga.inputBufSize
 }
 
@@ -315,16 +311,22 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 // message cannot be queued within that timeframe.
 //
 // Returns an error if:
-//   - The executable is nil
-//   - The actor is not in Started state
+//   - The executable is nil ([ErrActorReceiveNil])
+//   - The actor is still Initialized ([ErrActorNotStarted])
+//   - The actor has left Started ([ErrActorReceiveOnStopped])
 //   - The context is canceled
-//   - The receive timeout is exceeded
+//   - The receive timeout is exceeded ([ErrActorReceiveTimeout])
 func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	if e == nil {
 		return ErrActorReceiveNil
 	}
 
-	if atomic.LoadUint64(&ga.state) > 1 {
+	switch atomic.LoadUint64(&ga.state) {
+	case Started:
+		// ok
+	case Initialized:
+		return ErrActorNotStarted
+	default:
 		return ErrActorReceiveOnStopped
 	}
 
@@ -383,7 +385,7 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 		defer close(ga.done)
 
 		// Enrich context with actor context for handlers and middleware
-		actorScopedCtx := WithGoActorContext(ctx, ga.actorCtx)
+		actorScopedCtx := withGoActorContext(ctx, ga.actorCtx)
 
 		atomic.StoreUint64(&ga.state, Started)
 		close(ga.ready) // Signal that the actor is ready to receive messages
@@ -549,25 +551,9 @@ func (ga *GoActor[T]) catchPanic() {
 		atomic.StoreUint64(&ga.state, Panicked)
 		switch e := err.(type) {
 		case error:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				e,
-			))
-		case string:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("string panic: %s", e),
-			))
-		case int:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("int panic: %d", e),
-			))
+			ga.hooks.OnError(errors.Join(ErrActorPanic, e))
 		default:
-			ga.hooks.OnError(errors.Join(
-				ErrActorPanic,
-				fmt.Errorf("unknown panic type: %v", e),
-			))
+			ga.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", e)))
 		}
 	}
 }

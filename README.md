@@ -8,31 +8,29 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 [![Lint](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Module:** [`github.com/barnowlsnest/go-actorlib/v4`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4) · **Go:** 1.27+ · **License:** [MIT](LICENSE)
-
 ## Features
 
 - **Type-safe** — generics bind entities, commands, and refs at compile time
 - **Lightweight** — one actor is one goroutine plus a bounded channel
-- **ActorRef** — immutable proxy that exposes `Send`, `Stop`, `State`, and `Done`
-- **Command & Ask** — async commands with result channels, or a single-call request/response
-- **Actor System** — name registry, `Spawn`, typed `Send`/`Ask` by name, event bus, LIFO shutdown
-- **Supervision** — OneForOne / AllForOne restarts, death watch, restart-frequency limits
+- **ActorRef** — immutable proxy: `Send`, `Stop`, `State`, `Done`
+- **Command & Ask** — async result channels, or single-call request/response
+- **Actor System** — name registry, `Spawn`, typed `Send`/`Ask`, event bus, LIFO shutdown
+- **Supervision** — OneForOne / AllForOne, death watch, restart-frequency limits
 - **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
-- **Middleware** — composable logging, metrics, and panic recovery (`log/slog`)
+- **Middleware** — logging, metrics, and panic recovery (`go-logslib`)
 - **Dead letters** — queue for undeliverable messages with handlers
-- **Priority mailbox** — standalone `System` > `High` > `Normal` > `Low` queue (FIFO within a level)
-- **Signals** — SIGTERM / SIGINT graceful shutdown for systems and supervisors
+- **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `GoActor`)
+- **Signals** — SIGTERM / SIGINT graceful shutdown
 - **Panic recovery** — panics become errors; actors and commands stay isolated
 - **Race-tested** — the suite runs with the `-race` detector
 
 ## Why an actor library in Go?
 
-Go already has goroutines, channels, and `sync.Mutex`. This library is for the cases where those primitives are not enough on their own.
+Go already has goroutines, channels, and `sync.Mutex`. Use this library when you want exclusive state ownership plus structured lifecycle.
 
 ### Pros
 
-- **No locks, no data races by design.** Each actor owns its state. There is no shared mutable state to protect, so deadlocks, forgotten mutexes, and lock-ordering bugs are structural impossibilities rather than discipline problems.
+- **No locks, no data races by design.** Each actor owns its state. Deadlocks, forgotten mutexes, and lock-ordering bugs are prevented by structure, not discipline.
 - **Predictable sequential execution.** Commands are processed one at a time. Complex mutations stay single-threaded.
 - **Clear ownership.** The actor is the single source of truth for its entity.
 - **Structured lifecycle.** Start / stop / hooks give a consistent way to set up and tear down many concurrent components.
@@ -121,24 +119,13 @@ func main() {
 }
 ```
 
-Defaults: input buffer size `1`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`).
-
-### ActorRef
-
-`Ref` decouples the lifecycle owner from senders. Callers get `Send`, `Stop`, `State`, and `Done` — not `Start`, `WaitReady`, or internals. Multiple refs may point at the same actor.
-
-```go
-ref, err := actorref.New(myActor)
-if err != nil {
-    log.Fatal(err)
-}
-
-svc := NewOrderService(ref) // can send; cannot start or restart
-```
+Defaults: input buffer size `1`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ask.New` for request/response; use commands when you need async `Done()` / `Error()`.
 
 ### Commands
 
 ```go
+import "github.com/barnowlsnest/go-actorlib/v4/pkg/command"
+
 cmd := command.New(func(counter *Counter) (int, error) {
     counter.Value++
     return counter.Value, nil
@@ -155,17 +142,6 @@ if !ok {
 fmt.Printf("Counter value: %d\n", result)
 return cmd.Error()
 ```
-
-### Ask (request / response with timeout)
-
-```go
-result, err := ask.New(ctx, ref, func(counter *Counter) (int, error) {
-    counter.Value++
-    return counter.Value, nil
-}, 5*time.Second)
-```
-
-`ask.ErrAskTimeout` is returned when the timeout elapses before a result arrives.
 
 ### Manual lifecycle
 
@@ -224,15 +200,11 @@ Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
 ### Supervision
 
-Default policy: OneForOne, max 3 restarts within 5 seconds. Clean `Done` stops are not restarted.
+Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Clean `Done` stops are not restarted.
 
 ```go
 sup := supervision.NewSupervisor(
-    supervision.WithPolicy(supervision.RestartPolicy{
-        Strategy:       supervision.OneForOne, // or AllForOne
-        MaxRestarts:    3,
-        WithinDuration: 10 * time.Second,
-    }),
+    supervision.WithPolicy(supervision.DefaultRestartPolicy()),
 )
 
 if err := sup.Add("worker-1", &MyChildSpec{}); err != nil {
@@ -242,6 +214,9 @@ if err := sup.Add("worker-1", &MyChildSpec{}); err != nil {
 sup.Watch(func(name string, state uint64) {
     fmt.Printf("child %s terminated with state %d\n", name, state)
 })
+sup.OnRestartError(func(name string, err error) {
+    log.Printf("restart failed for %s: %v", name, err)
+})
 
 if err := sup.StartAll(ctx, 5*time.Second); err != nil {
     log.Fatal(err)
@@ -249,7 +224,7 @@ if err := sup.StartAll(ctx, 5*time.Second); err != nil {
 defer sup.StopAll(10 * time.Second)
 ```
 
-`ChildSpec` is the factory; `actorref.Ref` already implements `ChildRef`:
+`Watch` covers terminations; `OnRestartError` covers stop/start failures during a restart. `ChildSpec` is the factory; `actorref.Ref` already implements `ChildRef`:
 
 ```go
 type MyChildSpec struct{}
@@ -287,13 +262,14 @@ Place `Recovery` first if you want panics caught before they put the actor in `P
 
 ```go
 metrics := &middleware.Metrics{}
+log := logger.New(logger.Config{Level: logger.DebugLevel})
 
 myActor, err := actor.StartNew(ctx, 5*time.Second,
     actor.WithProvider(provider),
     actor.WithName[*Counter]("counter"),
     actor.WithMiddleware(
-        middleware.Recovery[*Counter](slog.Default()),
-        middleware.Logging[*Counter](slog.Default()),
+        middleware.Recovery[*Counter](log),
+        middleware.Logging[*Counter](log),
         middleware.MetricsMiddleware[*Counter](metrics),
     ),
 )
@@ -328,7 +304,7 @@ sys.StopAll(10 * time.Second)
 
 ### Priority mailbox
 
-`PriorityMailbox` is a standalone heap. The actor's built-in mailbox is a bounded Go channel; this type is not plugged in automatically.
+Standalone heap — not plugged into `GoActor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
 
 ```go
 mb := mailbox.NewPriority[*MyEntity](100)
@@ -340,8 +316,6 @@ mb.Push(lowCmd, mailbox.Low)
 msg, ok := mb.Pop() // systemCmd
 ```
 
-Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within the same level. `Push` returns `false` when the mailbox is full or closed.
-
 ## Packages
 
 | Package | Description |
@@ -352,7 +326,7 @@ Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within the 
 | [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/ask) | Request/response with timeout |
 | [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/system) | Name registry, `Spawn`, `Register`/`Send`/`Ask`, event bus |
 | [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
-| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/middleware) | Logging (`slog`), Metrics (atomic), Recovery |
+| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
 | [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/deadletter) | Dead-letter queue with capacity and handlers |
 | [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
 | [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4/pkg/mailbox) | Standalone priority mailbox |
@@ -361,38 +335,17 @@ PlantUML diagrams: [`docs/`](./docs/README.md).
 
 ## Performance notes
 
-- Tune input buffer size to your message volume; the default is `1`.
-- Set receive timeouts for backpressure; `0` means wait until `ctx` is done.
-- Always `Stop` actors (or `StopAll` on the system / supervisor) to avoid leaked goroutines.
-- Middleware is composed once at startup — no per-message allocation from the chain itself.
-- Restart-frequency limits on supervisors prevent restart storms.
+- Tune the input buffer (default `1`) and receive timeout for backpressure; always `Stop` / `StopAll` to avoid leaked goroutines.
+- Middleware is composed once at startup; supervisor restart-frequency limits prevent restart storms.
 
 ## Development
 
-Build automation uses [Task](https://taskfile.dev/):
-
 ```bash
 go install github.com/go-task/task/v3/cmd/task@latest
-
-task sanity        # tidy, fmt, lint --fix, build, vet, test
-task go-build      # go build ./...
-task go-test       # tests with -race, coverage, and benchmarks
-task go-lint-fix   # golangci-lint run --fix
-task go-fmt        # go fmt ./...
-task go-vet        # go vet ./...
-task go-tidy       # go mod tidy
+task sanity   # tidy, fmt, lint --fix, build, vet, test
 ```
 
-CI on `main` (push and pull request) runs build/test and [golangci-lint](https://golangci-lint.run/) v2.
-
-Fuzz tests:
-
-```bash
-go test -fuzz FuzzActorLifecycle -fuzztime 5s ./pkg/actor/
-go test -fuzz FuzzConcurrentStopAndSend -fuzztime 5s ./pkg/actor/
-```
-
-Runtime dependency: [go-datalib](https://github.com/barnowlsnest/go-datalib) (heap for the priority mailbox). [testify](https://github.com/stretchr/testify) is test-only.
+CI on `main` runs build/test and golangci-lint **v2.13**. Full task list, fuzz commands, and dependency notes: [`CLAUDE.md`](./CLAUDE.md) and [`Taskfile.yml`](./Taskfile.yml).
 
 ## Contributing
 
@@ -410,6 +363,4 @@ Please do not commit generated coverage files or editor config (see `.gitignore`
 
 ## References
 
-- [Actor Model](https://en.wikipedia.org/wiki/Actor_model)
 - [Go concurrency patterns](https://go.dev/blog/pipelines)
-- [pkg.go.dev documentation](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v4)

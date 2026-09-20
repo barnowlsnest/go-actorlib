@@ -11,6 +11,7 @@ import (
 // The provider option is required and must be included in opts.
 //
 // Returns the started actor or an error if any step fails.
+// If WaitReady fails after a successful Start, the actor is stopped best-effort.
 func StartNew[T Entity](ctx context.Context, readyTimeout time.Duration, opts ...GoActorOption[T]) (*GoActor[T], error) {
 	a, err := New(opts...)
 	if err != nil {
@@ -22,6 +23,7 @@ func StartNew[T Entity](ctx context.Context, readyTimeout time.Duration, opts ..
 	}
 
 	if readyErr := a.WaitReady(ctx, readyTimeout); readyErr != nil {
+		_ = a.Stop(readyTimeout)
 		return nil, readyErr
 	}
 

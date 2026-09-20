@@ -3,7 +3,8 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"log/slog"
+
+	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
@@ -16,11 +17,12 @@ import (
 //
 // Usage:
 //
+//	log := logger.New(logger.Config{Level: logger.ErrorLevel})
 //	actor.New(
 //		actor.WithProvider(provider),
-//		actor.WithMiddleware(middleware.Recovery[*MyEntity](slog.Default())),
+//		actor.WithMiddleware(middleware.Recovery[*MyEntity](log)),
 //	)
-func Recovery[T actor.Entity](logger *slog.Logger) actor.Middleware[T] {
+func Recovery[T actor.Entity](log *logger.Logger) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
 		return func(ctx context.Context, e actor.Executable[T], entity T) {
 			defer func() {
@@ -30,9 +32,9 @@ func Recovery[T actor.Entity](logger *slog.Logger) actor.Middleware[T] {
 						actorName = ac.Name()
 					}
 
-					logger.LogAttrs(ctx, slog.LevelError, "actor panic recovered by middleware",
-						slog.String("actor", actorName),
-						slog.String("panic", fmt.Sprintf("%v", r)),
+					log.WithContext(ctx).Error("actor panic recovered by middleware",
+						logger.StringField("actor", actorName),
+						logger.StringField("panic", fmt.Sprintf("%v", r)),
 					)
 				}
 			}()

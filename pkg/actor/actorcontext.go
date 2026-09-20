@@ -43,8 +43,8 @@ func (ac *GoActorContext[T]) Name() string {
 	return ac.name
 }
 
-// WithGoActorContext stores a GoActorContext in the given context.Context.
-func WithGoActorContext[T Entity](ctx context.Context, ac *GoActorContext[T]) context.Context {
+// withGoActorContext stores a GoActorContext in the given context.Context.
+func withGoActorContext[T Entity](ctx context.Context, ac *GoActorContext[T]) context.Context {
 	return context.WithValue(ctx, goActorContextKey, ac)
 }
 

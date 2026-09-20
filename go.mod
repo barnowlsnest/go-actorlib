@@ -3,14 +3,13 @@ module github.com/barnowlsnest/go-actorlib/v4
 go 1.27
 
 require (
-	github.com/barnowlsnest/go-datalib v0.0.0-20260201014700-be56b0e24ef7
-	github.com/stretchr/testify v1.11.1
+	github.com/barnowlsnest/go-datalib/v5 v5.4.0
+	github.com/barnowlsnest/go-logslib/v2 v2.2.0
+	github.com/stretchr/testify v1.12.1
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
+	golang.org/x/sync v0.23.0 // indirect
 )

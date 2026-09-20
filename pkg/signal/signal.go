@@ -40,10 +40,9 @@ func AwaitShutdown(ctx context.Context, s Stoppable, timeout time.Duration) erro
 
 	select {
 	case <-sigCh:
-		return s.StopAll(timeout)
 	case <-ctx.Done():
-		return s.StopAll(timeout)
 	}
+	return s.StopAll(timeout)
 }
 
 // NotifyShutdown returns a channel that receives when an OS signal (SIGTERM/SIGINT) is caught.

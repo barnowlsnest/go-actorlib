@@ -19,7 +19,7 @@ type RestartPolicy struct {
 	Strategy Strategy
 
 	// MaxRestarts is the maximum number of restarts allowed within the time window.
-	// If exceeded, the supervisor itself fails with ErrMaxRestartsExceeded.
+	// If exceeded, the supervisor stops restarting (no further restarts are attempted).
 	// Zero means unlimited restarts.
 	MaxRestarts int
 

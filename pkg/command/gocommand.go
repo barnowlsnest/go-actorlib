@@ -28,7 +28,7 @@
 //	})
 //
 //	// Send to actor (assuming myActor is already started)
-//	var myActor *actor.Actor // assume this is your actor instance
+//	var myActor *actor.GoActor[*MyEntity]
 //	err := myActor.Receive(ctx, cmd)
 //	if err != nil {
 //		panic(err)
@@ -119,7 +119,6 @@ type (
 // The command is created in the Created state and remains so until executed.
 func New[E actor.Entity, R any](fn DelegateFn[E, R]) *GoCommand[E, R] {
 	return &GoCommand[E, R]{
-		mu:         sync.Mutex{},
 		state:      Created,
 		done:       make(chan R, 1),
 		delegateFn: fn,

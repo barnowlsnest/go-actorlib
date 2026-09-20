@@ -1,6 +1,10 @@
 package system
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/barnowlsnest/go-actorlib/v4/pkg/ask"
+)
 
 // ErrSystemStopped is returned when attempting to perform operations on a stopped actor system.
 // After StopAll is called, no further operations are allowed.
@@ -26,6 +30,5 @@ var ErrActorNotFound = errors.New("actor not found")
 // does not match the entity type of the target actor.
 var ErrCommandTypeMismatch = errors.New("command type does not match actor entity type")
 
-// ErrAskTimeout is returned when the ask operation does not receive a result
-// from the command within the specified timeout duration.
-var ErrAskTimeout = errors.New("ask timeout waiting for command result")
+// ErrAskTimeout is an alias of [ask.ErrAskTimeout] for callers that import system only.
+var ErrAskTimeout = ask.ErrAskTimeout

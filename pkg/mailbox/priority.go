@@ -16,7 +16,7 @@ package mailbox
 import (
 	"sync"
 
-	"github.com/barnowlsnest/go-datalib/pkg/tree"
+	"github.com/barnowlsnest/go-datalib/v5/pkg/tree"
 
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )

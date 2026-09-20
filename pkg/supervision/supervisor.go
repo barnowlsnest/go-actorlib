@@ -5,7 +5,7 @@
 //   - OneForOne: only the failed child is restarted
 //   - AllForOne: all children are restarted when any child fails
 //
-// The supervisor tracks restart frequency and will stop itself if the maximum
+// The supervisor tracks restart frequency and stops further restarts if the maximum
 // number of restarts is exceeded within the configured time window.
 //
 // Example usage:
@@ -57,6 +57,10 @@ type ChildRef interface {
 // The name is the child's registered name.
 type WatchCallback func(name string, state uint64)
 
+// RestartErrorCallback is called when a restart attempt fails to stop or start a child.
+// Watch remains termination-only; this surfaces the underlying error from restart ops.
+type RestartErrorCallback func(name string, err error)
+
 type child struct {
 	name    string
 	spec    ChildSpec
@@ -67,13 +71,14 @@ type child struct {
 // Supervisor monitors child actors and restarts them according to a restart policy.
 // It is safe for concurrent use.
 type Supervisor struct {
-	mu       sync.Mutex
-	policy   RestartPolicy
-	children []*child
-	names    map[string]int // name → index in children slice
-	restarts []time.Time    // restart timestamps for frequency tracking
-	stopped  bool
-	watchers []WatchCallback
+	mu                   sync.Mutex
+	policy               RestartPolicy
+	children             []*child
+	names                map[string]int // name → index in children slice
+	restarts             []time.Time    // restart timestamps for frequency tracking
+	stopped              bool
+	watchers             []WatchCallback
+	restartErrorHandlers []RestartErrorCallback
 
 	stopTimeout time.Duration
 }
@@ -88,8 +93,8 @@ func WithPolicy(policy RestartPolicy) Option {
 	}
 }
 
-// WithStopTimeout sets the timeout used when stopping children during restarts.
-// Defaults to 5 seconds.
+// WithStopTimeout sets the timeout used when stopping children during AllForOne restarts
+// and StopAll sibling stops. Defaults to 5 seconds.
 func WithStopTimeout(timeout time.Duration) Option {
 	return func(s *Supervisor) {
 		s.stopTimeout = timeout
@@ -115,6 +120,29 @@ func (s *Supervisor) Watch(cb WatchCallback) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.watchers = append(s.watchers, cb)
+}
+
+// OnRestartError registers a callback invoked when a restart fails to stop or start a child.
+// Multiple handlers can be registered. Watch remains for terminations only.
+func (s *Supervisor) OnRestartError(cb RestartErrorCallback) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.restartErrorHandlers = append(s.restartErrorHandlers, cb)
+}
+
+func (s *Supervisor) notifyRestartError(name string, err error) {
+	if err == nil {
+		return
+	}
+
+	s.mu.Lock()
+	handlers := make([]RestartErrorCallback, len(s.restartErrorHandlers))
+	copy(handlers, s.restartErrorHandlers)
+	s.mu.Unlock()
+
+	for _, cb := range handlers {
+		cb(name, err)
+	}
 }
 
 // Add registers a child spec with the supervisor under the given name.
@@ -147,7 +175,13 @@ func (s *Supervisor) Add(name string, spec ChildSpec) error {
 
 // StartAll starts all registered children in order.
 // It monitors each child for termination and handles restarts according to the policy.
+//
+// readyTimeout is unused by the supervisor. ChildSpec.Start must apply its own readiness
+// deadline (for example via actor.StartNew) while treating ctx as the actor lifetime —
+// do not cancel ctx when Start returns.
 func (s *Supervisor) StartAll(ctx context.Context, readyTimeout time.Duration) error {
+	_ = readyTimeout
+
 	s.mu.Lock()
 	if s.stopped {
 		s.mu.Unlock()
@@ -158,14 +192,14 @@ func (s *Supervisor) StartAll(ctx context.Context, readyTimeout time.Duration) e
 	s.mu.Unlock()
 
 	for _, c := range children {
-		if err := s.startChild(ctx, c, readyTimeout); err != nil {
+		if err := s.startChild(ctx, c); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Supervisor) startChild(ctx context.Context, c *child, _ time.Duration) error {
+func (s *Supervisor) startChild(ctx context.Context, c *child) error {
 	ref, err := c.spec.Start(ctx)
 	if err != nil {
 		return err
@@ -261,15 +295,8 @@ func (s *Supervisor) handleTermination(ctx context.Context, c *child) {
 }
 
 func (s *Supervisor) restartOne(ctx context.Context, c *child) {
-	if err := s.startChild(ctx, c, 5*time.Second); err != nil {
-		s.mu.Lock()
-		watchers := make([]WatchCallback, len(s.watchers))
-		copy(watchers, s.watchers)
-		s.mu.Unlock()
-
-		for _, cb := range watchers {
-			cb(c.name, actor.StoppedWithError)
-		}
+	if err := s.startChild(ctx, c); err != nil {
+		s.notifyRestartError(c.name, err)
 	}
 }
 
@@ -286,13 +313,17 @@ func (s *Supervisor) restartAll(ctx context.Context) {
 		ref := c.ref
 		s.mu.Unlock()
 		if ref != nil {
-			_ = ref.Stop(s.stopTimeout)
+			if err := ref.Stop(s.stopTimeout); err != nil {
+				s.notifyRestartError(c.name, err)
+			}
 		}
 	}
 
 	// Restart all children
 	for _, c := range children {
-		_ = s.startChild(ctx, c, 5*time.Second)
+		if err := s.startChild(ctx, c); err != nil {
+			s.notifyRestartError(c.name, err)
+		}
 	}
 }
 
