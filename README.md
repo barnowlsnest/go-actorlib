@@ -214,6 +214,9 @@ if err := sup.Add("worker-1", &MyChildSpec{}); err != nil {
 sup.Watch(func(name string, state uint64) {
     fmt.Printf("child %s terminated with state %d\n", name, state)
 })
+sup.OnRestartError(func(name string, err error) {
+    log.Printf("restart failed for %s: %v", name, err)
+})
 
 if err := sup.StartAll(ctx, 5*time.Second); err != nil {
     log.Fatal(err)
@@ -221,7 +224,7 @@ if err := sup.StartAll(ctx, 5*time.Second); err != nil {
 defer sup.StopAll(10 * time.Second)
 ```
 
-`ChildSpec` is the factory; `actorref.Ref` already implements `ChildRef`:
+`Watch` covers terminations; `OnRestartError` covers stop/start failures during a restart. `ChildSpec` is the factory; `actorref.Ref` already implements `ChildRef`:
 
 ```go
 type MyChildSpec struct{}

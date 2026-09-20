@@ -40,6 +40,9 @@ var (
 	// All commands sent to actors must implement the Executable interface.
 	ErrActorReceiveNil = errors.New("actor receive nil command")
 
+	// ErrActorNotStarted is returned when attempting to send commands before the actor is Started.
+	ErrActorNotStarted = errors.New("actor not started")
+
 	// ErrActorReceiveOnStopped is returned when attempting to send commands to a stopped actor.
 	// Actors in Stopping, Done, StoppedWithError, Canceled, or Panicked states cannot receive messages.
 	ErrActorReceiveOnStopped = errors.New("actor receive on stopped actor")

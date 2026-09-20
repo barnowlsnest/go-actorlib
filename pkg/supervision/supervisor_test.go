@@ -2,6 +2,7 @@ package supervision
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,10 +13,17 @@ import (
 	"github.com/barnowlsnest/go-actorlib/v4/pkg/actor"
 )
 
+var (
+	errMockStart = errors.New("mock start failed")
+	errMockStop  = errors.New("mock stop failed")
+)
+
 // mockChildRef is a test implementation of ChildRef.
 type mockChildRef struct {
-	state uint64
-	done  chan struct{}
+	state    uint64
+	done     chan struct{}
+	stopErr  error
+	stopOnce sync.Once
 }
 
 func newMockChildRef() *mockChildRef {
@@ -26,12 +34,11 @@ func newMockChildRef() *mockChildRef {
 }
 
 func (m *mockChildRef) Stop(_ time.Duration) error {
-	atomic.StoreUint64(&m.state, actor.Done)
-	select {
-	case <-m.done:
-	default:
-		close(m.done)
+	if m.stopErr != nil {
+		return m.stopErr
 	}
+	atomic.StoreUint64(&m.state, actor.Done)
+	m.stopOnce.Do(func() { close(m.done) })
 	return nil
 }
 
@@ -46,17 +53,22 @@ func (m *mockChildRef) Done() <-chan struct{} {
 // terminate simulates the child terminating with a given state.
 func (m *mockChildRef) terminate(state uint64) {
 	atomic.StoreUint64(&m.state, state)
-	select {
-	case <-m.done:
-	default:
-		close(m.done)
-	}
+	m.stopOnce.Do(func() { close(m.done) })
 }
 
 // mockChildSpec creates mockChildRefs on each Start call.
 type mockChildSpec struct {
-	mu   sync.Mutex
+	mu sync.Mutex
+
 	refs []*mockChildRef
+
+	// failStartAfter: Start returns errMockStart once startCount would exceed this.
+	// 0 means never fail. Use -1 via failNextStart for "fail the next Start".
+	failStartAfter int
+	failNextStart  bool
+
+	// stopErrOnRefs created while this is set are given stopErr.
+	stopErrOnNew error
 }
 
 func newMockChildSpec() *mockChildSpec {
@@ -64,10 +76,22 @@ func newMockChildSpec() *mockChildSpec {
 }
 
 func (s *mockChildSpec) Start(_ context.Context) (ChildRef, error) {
-	ref := newMockChildRef()
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.failNextStart {
+		s.failNextStart = false
+		return nil, errMockStart
+	}
+	if s.failStartAfter > 0 && len(s.refs) >= s.failStartAfter {
+		return nil, errMockStart
+	}
+
+	ref := newMockChildRef()
+	if s.stopErrOnNew != nil {
+		ref.stopErr = s.stopErrOnNew
+	}
 	s.refs = append(s.refs, ref)
-	s.mu.Unlock()
 	return ref, nil
 }
 
@@ -84,6 +108,18 @@ func (s *mockChildSpec) startCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.refs)
+}
+
+func (s *mockChildSpec) setFailStartAfter(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failStartAfter = n
+}
+
+func (s *mockChildSpec) setStopErrOnNew(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopErrOnNew = err
 }
 
 // --- Test Suite ---
@@ -251,6 +287,107 @@ func (s *SupervisorTestSuite) TestAllForOne_ChildFails_ShouldRestartAll() {
 	time.Sleep(50 * time.Millisecond)
 
 	// Both should have been restarted
+	s.Equal(2, spec1.startCount())
+	s.Equal(2, spec2.startCount())
+}
+
+func (s *SupervisorTestSuite) TestOnRestartError_OneForOne_StartFails_ShouldNotify() {
+	sup := NewSupervisor(WithPolicy(RestartPolicy{
+		Strategy:       OneForOne,
+		MaxRestarts:    5,
+		WithinDuration: 10 * time.Second,
+	}))
+
+	spec := newMockChildSpec()
+	spec.setFailStartAfter(1) // initial Start succeeds; restart Start fails
+
+	s.Require().NoError(sup.Add("worker", spec))
+	s.Require().NoError(sup.StartAll(s.ctx, time.Second))
+
+	var gotName atomic.Value
+	var gotErr atomic.Value
+	sup.OnRestartError(func(name string, err error) {
+		gotName.Store(name)
+		gotErr.Store(err)
+	})
+
+	var watchFired atomic.Bool
+	sup.Watch(func(string, uint64) {
+		watchFired.Store(true)
+	})
+
+	spec.lastRef().terminate(actor.Panicked)
+	time.Sleep(50 * time.Millisecond)
+
+	s.Equal("worker", gotName.Load())
+	s.ErrorIs(gotErr.Load().(error), errMockStart)
+	s.Equal(1, spec.startCount())
+	// Watch fires for the real termination, not for the restart-ops failure.
+	s.True(watchFired.Load())
+}
+
+func (s *SupervisorTestSuite) TestOnRestartError_AllForOne_StartFails_ShouldNotifyAndContinue() {
+	sup := NewSupervisor(WithPolicy(RestartPolicy{
+		Strategy:       AllForOne,
+		MaxRestarts:    5,
+		WithinDuration: 10 * time.Second,
+	}))
+
+	spec1 := newMockChildSpec()
+	spec1.setFailStartAfter(1)
+	spec2 := newMockChildSpec()
+
+	s.Require().NoError(sup.Add("worker-1", spec1))
+	s.Require().NoError(sup.Add("worker-2", spec2))
+	s.Require().NoError(sup.StartAll(s.ctx, time.Second))
+
+	var mu sync.Mutex
+	var names []string
+	sup.OnRestartError(func(name string, err error) {
+		mu.Lock()
+		names = append(names, name)
+		mu.Unlock()
+		s.ErrorIs(err, errMockStart)
+	})
+
+	spec1.lastRef().terminate(actor.Panicked)
+	time.Sleep(50 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	s.Equal([]string{"worker-1"}, names)
+	s.Equal(1, spec1.startCount())
+	s.Equal(2, spec2.startCount()) // sibling still restarted
+}
+
+func (s *SupervisorTestSuite) TestOnRestartError_AllForOne_StopFails_ShouldNotify() {
+	sup := NewSupervisor(WithPolicy(RestartPolicy{
+		Strategy:       AllForOne,
+		MaxRestarts:    5,
+		WithinDuration: 10 * time.Second,
+	}))
+
+	spec1 := newMockChildSpec()
+	spec2 := newMockChildSpec()
+	spec2.setStopErrOnNew(errMockStop)
+
+	s.Require().NoError(sup.Add("worker-1", spec1))
+	s.Require().NoError(sup.Add("worker-2", spec2))
+	s.Require().NoError(sup.StartAll(s.ctx, time.Second))
+
+	var gotName atomic.Value
+	var gotErr atomic.Value
+	sup.OnRestartError(func(name string, err error) {
+		gotName.Store(name)
+		gotErr.Store(err)
+	})
+
+	spec1.lastRef().terminate(actor.Panicked)
+	time.Sleep(50 * time.Millisecond)
+
+	s.Equal("worker-2", gotName.Load())
+	s.ErrorIs(gotErr.Load().(error), errMockStop)
+	// Both children still get a start attempt after the stop phase.
 	s.Equal(2, spec1.startCount())
 	s.Equal(2, spec2.startCount())
 }

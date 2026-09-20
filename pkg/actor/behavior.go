@@ -41,7 +41,7 @@ func (b *BehaviorStack[T]) Unbecome() bool {
 	return true
 }
 
-// Depth returns the number of behaviors on the stack.
-func (b *BehaviorStack[T]) Depth() int {
+// depth returns the number of behaviors on the stack.
+func (b *BehaviorStack[T]) depth() int {
 	return len(b.stack)
 }

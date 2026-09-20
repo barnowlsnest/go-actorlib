@@ -46,7 +46,7 @@ func (s *BehaviorTestSuite) TestBehaviorStack_Current_ShouldReturnInitialHandler
 
 	// Assert
 	s.True(called)
-	s.Equal(1, stack.Depth())
+	s.Equal(1, stack.depth())
 }
 
 func (s *BehaviorTestSuite) TestBehaviorStack_Become_ShouldSwitchHandler() {
@@ -62,7 +62,7 @@ func (s *BehaviorTestSuite) TestBehaviorStack_Become_ShouldSwitchHandler() {
 
 	// Assert
 	s.Equal(2, handlerID)
-	s.Equal(2, stack.Depth())
+	s.Equal(2, stack.depth())
 }
 
 func (s *BehaviorTestSuite) TestBehaviorStack_Unbecome_ShouldRestorePrevious() {
@@ -80,7 +80,7 @@ func (s *BehaviorTestSuite) TestBehaviorStack_Unbecome_ShouldRestorePrevious() {
 	// Assert
 	s.True(ok)
 	s.Equal(1, handlerID)
-	s.Equal(1, stack.Depth())
+	s.Equal(1, stack.depth())
 }
 
 func (s *BehaviorTestSuite) TestBehaviorStack_Unbecome_OnInitialBehavior_ShouldReturnFalse() {
@@ -93,7 +93,7 @@ func (s *BehaviorTestSuite) TestBehaviorStack_Unbecome_OnInitialBehavior_ShouldR
 
 	// Assert
 	s.False(ok)
-	s.Equal(1, stack.Depth())
+	s.Equal(1, stack.depth())
 }
 
 func (s *BehaviorTestSuite) TestBehaviorStack_BecomeReplace_ShouldReplaceWithoutPush() {
@@ -109,7 +109,7 @@ func (s *BehaviorTestSuite) TestBehaviorStack_BecomeReplace_ShouldReplaceWithout
 
 	// Assert
 	s.Equal(2, handlerID)
-	s.Equal(1, stack.Depth()) // No push, same depth
+	s.Equal(1, stack.depth()) // No push, same depth
 }
 
 func (s *BehaviorTestSuite) TestGoActorContext_Become_ShouldSwitchActorBehavior() {

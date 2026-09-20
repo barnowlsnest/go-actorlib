@@ -471,6 +471,15 @@ func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	s.Equal(ErrActorReceiveNil, err)
 }
 
+func (s *GoActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
+	actor, err := New(WithProvider[*TestEntity](s.provider))
+	s.NoError(err)
+
+	err = actor.Receive(s.ctx, NewTestCommand("test-cmd", nil))
+
+	s.ErrorIs(err, ErrActorNotStarted)
+}
+
 func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[*TestEntity](s.provider))

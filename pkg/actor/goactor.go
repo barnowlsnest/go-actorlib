@@ -311,16 +311,22 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 // message cannot be queued within that timeframe.
 //
 // Returns an error if:
-//   - The executable is nil
-//   - The actor is not in Started state
+//   - The executable is nil ([ErrActorReceiveNil])
+//   - The actor is still Initialized ([ErrActorNotStarted])
+//   - The actor has left Started ([ErrActorReceiveOnStopped])
 //   - The context is canceled
-//   - The receive timeout is exceeded
+//   - The receive timeout is exceeded ([ErrActorReceiveTimeout])
 func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	if e == nil {
 		return ErrActorReceiveNil
 	}
 
-	if atomic.LoadUint64(&ga.state) > 1 {
+	switch atomic.LoadUint64(&ga.state) {
+	case Started:
+		// ok
+	case Initialized:
+		return ErrActorNotStarted
+	default:
 		return ErrActorReceiveOnStopped
 	}
 
@@ -379,7 +385,7 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 		defer close(ga.done)
 
 		// Enrich context with actor context for handlers and middleware
-		actorScopedCtx := WithGoActorContext(ctx, ga.actorCtx)
+		actorScopedCtx := withGoActorContext(ctx, ga.actorCtx)
 
 		atomic.StoreUint64(&ga.state, Started)
 		close(ga.ready) // Signal that the actor is ready to receive messages

@@ -49,7 +49,7 @@ Ten packages under `pkg/`.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
 - **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown.
-- **Receive** rejects nil commands and any state after Started (`state > 1`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
+- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started (`ErrActorReceiveOnStopped`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
 - Defaults: `inputBufSize = 1`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
 - Also: `Name()`, `Done()`, `InputBufferSize()`, `CheckState`, `State`.
@@ -74,6 +74,7 @@ Ten packages under `pkg/`.
 ### `pkg/system` — Actor system with registry and lifecycle
 
 - **`ActorSystem`** — Flat name registry. Thread-safe. After `StopAll`, further ops return `ErrSystemStopped`.
+- **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
 - **`Spawn[T]`** — `actor.New` + `Start` + `WaitReady` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
@@ -83,11 +84,12 @@ Ten packages under `pkg/`.
 
 - **`Supervisor`** — Monitors children and restarts on failure. Thread-safe.
 - **`ChildSpec`** — `Start(ctx) (ChildRef, error)`.
-- **`ChildRef`** — `Stop`, `State`, `Done`. `actorref.Ref` satisfies this.
+- **`ChildRef`** — `Stop`, `State`, `Done` (needed for death watch). `actorref.Ref` satisfies this. Broader than `system.ManagedActor`.
 - **Strategies**: `OneForOne` (restart only the failed child), `AllForOne` (stop+restart all). Clean `actor.Done` does **not** restart.
 - **`RestartPolicy`** — Strategy, `MaxRestarts` (0 = unlimited), `WithinDuration`. **`DefaultRestartPolicy()`**: OneForOne, max 3 within 5s.
-- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping siblings on AllForOne).
+- Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping siblings on AllForOne and as restart start timeout).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
+- **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
 
