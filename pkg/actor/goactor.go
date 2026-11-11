@@ -395,6 +395,10 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 			ga.hooks.AfterStart()
 		}()
 
+		if ga.panicked() {
+			return
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -422,6 +426,12 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 						defer ga.catchPanic()
 						ga.behavior.Current()(actorScopedCtx, e, entity)
 					}()
+
+					// A recovered panic is terminal: exit so Done closes and
+					// supervisors observe the failure.
+					if ga.panicked() {
+						return
+					}
 				}
 			}
 		}
@@ -539,6 +549,11 @@ func WithHooks[T Entity](hooks Hooks) GoActorOption[T] {
 		actor.hooks = hooks
 		return actor
 	}
+}
+
+// panicked reports whether a recovered panic has moved the actor to the Panicked state.
+func (ga *GoActor[T]) panicked() bool {
+	return atomic.LoadUint64(&ga.state) == Panicked
 }
 
 // catchPanic recovers from panics that occur during hook execution or command processing.

@@ -523,3 +523,46 @@ func (s *SupervisorTestSuite) TestStartAll_WithActorStartNew_ShouldKeepChildStar
 
 	s.NoError(sup.StopAll(time.Second))
 }
+
+type panicCommand struct{}
+
+func (panicCommand) Execute(context.Context, *supervisedEntity) { panic("boom") }
+
+// panickingOnceSpec starts real actors; the first instance panics on its first message.
+type panickingOnceSpec struct {
+	starts atomic.Int32
+}
+
+func (s *panickingOnceSpec) Start(ctx context.Context) (ChildRef, error) {
+	a, err := actor.StartNew(ctx, time.Second,
+		actor.WithProvider(&supervisedEntityProvider{&supervisedEntity{}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if s.starts.Add(1) == 1 {
+		if err := a.Receive(ctx, panicCommand{}); err != nil {
+			return nil, err
+		}
+	}
+	return actorref.New(a)
+}
+
+func (s *SupervisorTestSuite) TestRealActorPanic_ShouldRestartChild() {
+	// Arrange
+	spec := &panickingOnceSpec{}
+	sup := NewSupervisor()
+	s.Require().NoError(sup.Add("worker", spec))
+
+	// Act
+	s.Require().NoError(sup.StartAll(s.ctx, 0))
+
+	// Assert
+	s.Eventually(func() bool { return spec.starts.Load() == 2 }, time.Second, 10*time.Millisecond)
+	s.Eventually(func() bool {
+		state, err := sup.ChildState("worker")
+		return err == nil && state == uint64(actor.Started)
+	}, time.Second, 10*time.Millisecond)
+
+	s.NoError(sup.StopAll(time.Second))
+}
