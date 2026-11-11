@@ -31,9 +31,17 @@ type Handler func(Letter)
 // Queue collects and notifies about dead letters.
 // It is safe for concurrent use.
 type Queue struct {
-	mu       sync.Mutex
+	mu sync.Mutex
+	// letters is a fixed-size ring buffer of len capacity. The retained letters
+	// are letters[head], letters[head+1], ... (mod capacity), count of them,
+	// oldest first.
 	letters  []Letter
+	head     int
+	count    int
 	capacity int
+	// handlers is append-only: OnDeadLetter appends and nothing ever rewrites
+	// an existing element, so a snapshot of the slice header taken under mu
+	// stays valid after mu is released and needs no copy.
 	handlers []Handler
 }
 
@@ -59,7 +67,7 @@ func New(opts ...Option) *Queue {
 		opt(q)
 	}
 	q.capacity = max(q.capacity, 0)
-	q.letters = make([]Letter, 0, q.capacity)
+	q.letters = make([]Letter, q.capacity)
 	return q
 }
 
@@ -72,18 +80,25 @@ func (q *Queue) OnDeadLetter(h Handler) {
 }
 
 // Publish adds a dead letter to the queue and notifies all handlers.
+//
+// At capacity, the oldest letter is overwritten in place, so Publish never
+// allocates or copies the buffer. The previous slice-based queue resliced from
+// the front and reallocated every few hundred publishes, copying all retained
+// letters (91 B/op at the default capacity, BenchmarkPublish_AtCapacity).
+// Handlers registered during this call are not notified of this letter.
 func (q *Queue) Publish(l Letter) {
 	q.mu.Lock()
 	if q.capacity > 0 {
-		// Evict oldest if at capacity
-		if len(q.letters) >= q.capacity {
-			q.letters = q.letters[1:]
+		if q.count < q.capacity {
+			q.letters[(q.head+q.count)%q.capacity] = l
+			q.count++
+		} else {
+			q.letters[q.head] = l // overwrite the oldest
+			q.head = (q.head + 1) % q.capacity
 		}
-		q.letters = append(q.letters, l)
 	}
 
-	handlers := make([]Handler, len(q.handlers))
-	copy(handlers, q.handlers)
+	handlers := q.handlers // append-only; see the handlers field
 	q.mu.Unlock()
 
 	for _, h := range handlers {
@@ -91,12 +106,13 @@ func (q *Queue) Publish(l Letter) {
 	}
 }
 
-// Letters returns a copy of all retained dead letters.
+// Letters returns a copy of all retained dead letters, oldest first.
 func (q *Queue) Letters() []Letter {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	result := make([]Letter, len(q.letters))
-	copy(result, q.letters)
+	result := make([]Letter, q.count)
+	n := copy(result, q.letters[q.head:min(q.head+q.count, q.capacity)])
+	copy(result[n:], q.letters[:q.count-n])
 	return result
 }
 
@@ -104,12 +120,14 @@ func (q *Queue) Letters() []Letter {
 func (q *Queue) Count() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return len(q.letters)
+	return q.count
 }
 
 // Clear removes all retained dead letters.
 func (q *Queue) Clear() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.letters = q.letters[:0]
+	clear(q.letters) // drop references so evicted strings can be collected
+	q.head = 0
+	q.count = 0
 }

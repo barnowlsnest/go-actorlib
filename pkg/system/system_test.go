@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1020,4 +1021,27 @@ func (s *ActorSystemTestSuite) TestStopAll_WithRegisteredButNeverStartedActor_Sh
 	s.Less(time.Since(start), 500*time.Millisecond, "StopAll waited for Done of an actor that never started")
 	s.ErrorIs(err, actor.ErrActorNotRunning)
 	s.NotErrorIs(err, actor.ErrActorGracefulStopTimeout)
+}
+
+func TestOnEvent_ConcurrentWithEmit_ShouldBeSafe(t *testing.T) {
+	// Arrange - emitEvent iterates a handler snapshot without copying it, while
+	// OnEvent appends; run under -race.
+	s := New()
+	var calls atomic.Int64
+	var wg sync.WaitGroup
+
+	// Act
+	for range 50 {
+		wg.Go(func() { s.OnEvent(func(Event) { calls.Add(1) }) })
+		wg.Go(func() { s.emitEvent(Event{Kind: EventActorStopped, ActorName: "a"}) })
+	}
+	wg.Wait()
+
+	calls.Store(0)
+	s.emitEvent(Event{Kind: EventActorStopped, ActorName: "b"})
+
+	// Assert - every handler is registered exactly once
+	if got := calls.Load(); got != 50 {
+		t.Fatalf("expected 50 handler calls, got %d", got)
+	}
 }

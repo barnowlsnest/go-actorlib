@@ -115,7 +115,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/deadletter` — Dead letter queue
 
-- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Default capacity 1000, oldest evicted. Capacity `<= 0` retains nothing but still notifies handlers. Thread-safe.
+- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Fixed-size ring buffer: default capacity 1000, oldest overwritten; `Publish` does not allocate. Capacity `<= 0` retains nothing but still notifies handlers. Thread-safe.
 - **`Letter`** — `Target` (actor name), `Reason`.
 - **`OnDeadLetter`**, **`Letters()`** (copy), **`Count()`**, **`Clear()`**.
 
