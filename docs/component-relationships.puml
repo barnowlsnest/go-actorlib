@@ -37,7 +37,7 @@ package "Type System" {
 }
 
 package "Actor Core (pkg/actor)" {
-  class "GoActor<T>" as GoActor {
+  class "Actor<T>" as Actor {
     -state uint64
     -input chan Executable<T>
     -done chan struct{}
@@ -50,8 +50,8 @@ package "Actor Core (pkg/actor)" {
     -actorCtx *GoActorContext<T>
     -middleware []Middleware<T>
     --
-    +{static} New(opts...) (*GoActor<T>, error)
-    +{static} StartNew(ctx, timeout, opts...) (*GoActor<T>, error)
+    +{static} New(opts...) (*Actor<T>, error)
+    +{static} StartNew(ctx, timeout, opts...) (*Actor<T>, error)
     +Start(context.Context) error
     +Stop(time.Duration) error
     +Receive(context.Context, Executable<T>) error
@@ -103,7 +103,7 @@ package "Actor Core (pkg/actor)" {
 
 package "Actor Ref (pkg/actorref)" {
   class "Ref<T>" as Ref {
-    -actor *GoActor<T>
+    -actor *Actor<T>
     --
     +{static} New(actor) (*Ref<T>, error)
     +Send(context.Context, Executable<T>) error
@@ -115,13 +115,13 @@ package "Actor Ref (pkg/actorref)" {
 }
 
 package "Command System (pkg/command)" {
-  class "GoCommand<E,R>" as GoCommand {
+  class "Command<E,R>" as Command {
     -state int
     -done chan R
     -err error
     -delegateFn DelegateFn<E,R>
     --
-    +{static} New(DelegateFn<E,R>) *GoCommand<E,R>
+    +{static} New(DelegateFn<E,R>) *Command<E,R>
     +Execute(context.Context, E)
     +Done() <-chan R
     +Error() error
@@ -256,37 +256,37 @@ package "Mailbox (pkg/mailbox)" {
 }
 
 ' Inheritance / implementation
-GoCommand ..|> Executable
+Command ..|> Executable
 Ref ..|> ManagedActor
 Ref ..|> ChildRef
 
 ' Composition
-GoActor *-- EntityProvider
-GoActor *-- Hooks
-GoActor *-- BehaviorStack
-GoActor *-- GoActorContext
-GoActor o-- Executable : processes
-GoActor o-- MiddlewareType : chains
-GoCommand *-- DelegateFn
-Ref --> GoActor : wraps
+Actor *-- EntityProvider
+Actor *-- Hooks
+Actor *-- BehaviorStack
+Actor *-- GoActorContext
+Actor o-- Executable : processes
+Actor o-- MiddlewareType : chains
+Command *-- DelegateFn
+Ref --> Actor : wraps
 
 ' Dependencies
 EntityProvider ..> Entity : provides
 DelegateFn ..> Entity : operates on
 Executable ..> Entity : processes
 EntityPtr --|> Entity
-GoActorOption ..> GoActor : configures
+GoActorOption ..> Actor : configures
 HandlerFunc ..> Executable : handles
 GoActorContext --> BehaviorStack : delegates to
 
 ' Ask uses Ref
 Ref ..> DelegateFn : Ask wraps into command
 Ref ..> AskAwait : Ask waits via
-AskAwait ..> GoCommand : awaits
+AskAwait ..> Command : awaits
 
 ' System
 ActorSystem o-- ManagedActor : manages
-ActorSystem ..> GoActor : Spawn creates
+ActorSystem ..> Actor : Spawn creates
 ActorSystem ..> Ref : Spawn wraps in
 ActorSystem --> Event : emits
 

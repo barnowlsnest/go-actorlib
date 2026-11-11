@@ -10,7 +10,7 @@ participant "ActorSystem" as sys
 participant "EventHandler" as handler
 participant "actor.New" as factory
 participant "Ref<T>" as ref
-participant "GoActor<T>" as actor
+participant "Actor<T>" as actor
 
 == System Setup ==
 user -> sys : system.New()
