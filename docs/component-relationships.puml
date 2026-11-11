@@ -9,12 +9,22 @@ package "Type System" {
     +IsProvidable() bool
   }
 
+  interface "EntityPtr<T>" as EntityPtr <<constraint>> {
+    *T
+    Entity
+  }
+  note right of EntityPtr
+    T is the entity's base type (Actor[Counter]);
+    actors always manage *T. New / StartNew / Spawn
+    infer PT EntityPtr[T] to require *T implements Entity.
+  end note
+
   interface "Executable<T>" as Executable {
-    +Execute(context.Context, T)
+    +Execute(context.Context, *T)
   }
 
   interface "EntityProvider<T>" as EntityProvider {
-    +Provide() T
+    +Provide() *T
   }
 
   interface Hooks {
@@ -52,7 +62,7 @@ package "Actor Core (pkg/actor)" {
   }
 
   class "HandlerFunc<T>" as HandlerFunc <<type>> {
-    func(ctx, Executable<T>, T)
+    func(ctx, Executable<T>, *T)
   }
 
   class "Middleware<T>" as MiddlewareType <<type>> {
@@ -118,7 +128,7 @@ package "Command System (pkg/command)" {
   }
 
   class "DelegateFn<T,R>" as DelegateFn <<type>> {
-    func(entity T) (R, error)
+    func(entity *T) (R, error)
   }
 }
 
@@ -263,6 +273,7 @@ Ref --> GoActor : wraps
 EntityProvider ..> Entity : provides
 DelegateFn ..> Entity : operates on
 Executable ..> Entity : processes
+EntityPtr --|> Entity
 GoActorOption ..> GoActor : configures
 HandlerFunc ..> Executable : handles
 GoActorContext --> BehaviorStack : delegates to

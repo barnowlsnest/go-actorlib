@@ -97,7 +97,7 @@ func main() {
 
     a, err := actor.StartNew(ctx, 5*time.Second,
         actor.WithProvider(&CounterProvider{&Counter{}}),
-        actor.WithName[*Counter]("counter"),
+        actor.WithName[Counter]("counter"),
     )
     if err != nil {
         log.Fatal(err)
@@ -119,6 +119,8 @@ func main() {
     fmt.Println(n) // 1
 }
 ```
+
+Type parameters name the entity's base type — `actor.Actor[Counter]`, `actor.WithName[Counter]` — while the actor always manages a `*Counter`: commands, handlers, and providers receive or return `*Counter`. `actor.New`, `actor.StartNew`, and `system.Spawn` check at compile time that `*Counter` implements `actor.Entity`.
 
 Defaults: input buffer size `16`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ask.New` for request/response; use commands when you need async `Done()` / `Error()`.
 
@@ -162,8 +164,8 @@ Custom `Executable` types can implement `actor.Cancelable` (`Cancel(err error)`)
 ```go
 myActor, err := actor.New(
     actor.WithProvider(&CounterProvider{&Counter{}}),
-    actor.WithInputBufferSize[*Counter](10),
-    actor.WithReceiveTimeout[*Counter](5*time.Second),
+    actor.WithInputBufferSize[Counter](10),
+    actor.WithReceiveTimeout[Counter](5*time.Second),
 )
 if err != nil {
     log.Fatal(err)
@@ -195,7 +197,7 @@ sys := system.New()
 ref, err := system.Spawn(sys, ctx, "counter-1",
     &CounterProvider{&Counter{}},
     5*time.Second,
-    actor.WithInputBufferSize[*Counter](10),
+    actor.WithInputBufferSize[Counter](10),
 )
 if err != nil {
     log.Fatal(err)
@@ -264,14 +266,14 @@ func (s *MyChildSpec) Start(ctx context.Context) (supervision.ChildRef, error) {
 ### Behavior change
 
 ```go
-func initialHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
+func initialHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[*MyEntity](ctx).Become(authenticatedHandler)
+    actor.GetGoActorContext[MyEntity](ctx).Become(authenticatedHandler)
 }
 
-func authenticatedHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
+func authenticatedHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[*MyEntity](ctx).Unbecome()
+    actor.GetGoActorContext[MyEntity](ctx).Unbecome()
 }
 ```
 
@@ -287,11 +289,11 @@ log := logger.New(logger.Config{Level: logger.DebugLevel})
 
 myActor, err := actor.StartNew(ctx, 5*time.Second,
     actor.WithProvider(provider),
-    actor.WithName[*Counter]("counter"),
+    actor.WithName[Counter]("counter"),
     actor.WithMiddleware(
-        middleware.Recovery[*Counter](log),
-        middleware.Logging[*Counter](log),
-        middleware.MetricsMiddleware[*Counter](metrics),
+        middleware.Recovery[Counter](log),
+        middleware.Logging[Counter](log),
+        middleware.MetricsMiddleware[Counter](metrics),
     ),
 )
 ```
@@ -328,7 +330,7 @@ sys.StopAll(10 * time.Second)
 Standalone heap — not plugged into `Actor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
 
 ```go
-mb := mailbox.NewPriority[*MyEntity](100)
+mb := mailbox.NewPriority[MyEntity](100)
 
 mb.Push(normalCmd, mailbox.Normal)
 mb.Push(systemCmd, mailbox.System) // processed first

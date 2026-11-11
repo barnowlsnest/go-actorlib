@@ -38,10 +38,11 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actor` — Core actor implementation
 
-- **`Actor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
-- **`Entity`** — `IsProvidable() bool`.
-- **`Executable[T Entity]`** — Commands sent via `Receive()`.
-- **`EntityProvider[T]`** — `Provide() T`; required at construction (`ErrActorNilProvider`).
+- **`Actor[T any]`** — Generic actor that manages an entity of type `*T` in an isolated goroutine. `T` is the entity's base type: `Actor[Counter]`, `WithName[Counter]`, never `[*Counter]`. Processes `Executable[T]` commands sequentially from a bounded input channel.
+- **`Entity`** — `IsProvidable() bool`, implemented by `*T`.
+- **`EntityPtr[T]`** — `interface{ *T; Entity }`. `New`, `StartNew`, and `system.Spawn` take a trailing `PT EntityPtr[T]`, inferred from `T`, to require at compile time that `*T` implements `Entity`; `New` binds `PT(e).IsProvidable()` into a closure so `Actor[T]` keeps one type parameter. Every other generic in the module is `[T any]`.
+- **`Executable[T any]`** — `Execute(ctx, *T)`; commands sent via `Receive()`.
+- **`EntityProvider[T]`** — `Provide() *T`; required at construction (`ErrActorNilProvider`).
 - **`Hooks`** — BeforeStart, AfterStart, BeforeStop, AfterStop, OnError. Default is `noopHooks`.
 - **`BehaviorStack[T]`** — Stack of `HandlerFunc[T]`. `Become` (push), `BecomeReplace` (swap top), `Unbecome` (pop; cannot pop the base handler). Goroutine-local; no synchronization.
 - **`GoActorContext[T]`** — Injected into the message `context.Context` at start. `GetGoActorContext[T](ctx)` returns nil outside a handler. Valid only for the current message. Exposes `Become`, `BecomeReplace`, `Unbecome`, `Name`.
@@ -60,13 +61,13 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actorref` — Typed actor handle (proxy)
 
-- **`Ref[T Entity]`** — Immutable proxy (`actor` field unexported). `Send`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
+- **`Ref[T any]`** — Immutable proxy (`actor` field unexported). `Send`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
 - **`New[T](a *Actor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
 - Safe for concurrent use; multiple refs can point to the same actor. `Send` delegates to `Receive`.
 
 ### `pkg/command` — Command pattern for async operations
 
-- **`Command[E Entity, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
+- **`Command[E, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity *E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished / Failed / Canceled / Panic.
 - **Runs at most once** — `Execute` moves Created → Started under the mutex; repeat calls, or Execute after `Cancel`, are no-ops.
 - **`Cancel(err)`** — Created → Canceled, closes `Done()`; no-op once started (implements `actor.Cancelable`).
@@ -75,7 +76,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/ask` — Ask pattern (request/response convenience)
 
-- **`New[E Entity, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*Actor[E]`.
+- **`New[E, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*Actor[E]`.
 - **`ErrAskTimeout`** — Result not received within timeout. Also returns `ctx.Err()` if the context is done first.
 
 ### `pkg/system` — Actor system with registry and lifecycle
