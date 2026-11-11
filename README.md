@@ -153,7 +153,7 @@ A `GoCommand` runs at most once — sending the same command twice executes it o
 | Context canceled before execution | `Canceled` | `ErrCommandContextCancelled` joined with `ctx.Err()` |
 | Actor terminated while the command was queued | `Canceled` | `actor.ErrActorCommandDropped` |
 
-Custom `Executable` types can implement `actor.Cancelable` (`Cancel(err error)`) to be notified when they are dropped.
+Custom `Executable` types can implement `actor.Cancelable` (`Cancel(err error)`) to be notified when they are dropped. `Cancel` runs on the actor's goroutine before `Done()` closes, so keep it quick and never block in it on the actor itself (for example by waiting on its `Done()`) — that stalls shutdown and makes `Stop` time out.
 
 ### Manual lifecycle
 
