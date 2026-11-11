@@ -214,7 +214,7 @@ func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 	s.NoError(err)
 	s.NotNil(actor)
 	s.Equal(uint64(Initialized), actor.State())
-	s.Equal(1, actor.InputBufferSize())
+	s.Equal(defaultInputBufSize, actor.InputBufferSize())
 	s.NotNil(actor.input)
 	s.NotNil(actor.done)
 	s.NotNil(actor.ready)

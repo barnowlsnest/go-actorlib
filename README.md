@@ -120,7 +120,7 @@ func main() {
 }
 ```
 
-Defaults: input buffer size `1`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ask.New` for request/response; use commands when you need async `Done()` / `Error()`.
+Defaults: input buffer size `16`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ask.New` for request/response; use commands when you need async `Done()` / `Error()`.
 
 ### Commands
 
@@ -356,7 +356,7 @@ PlantUML diagrams: [`docs/`](./docs/README.md).
 
 ## Performance notes
 
-- Tune the input buffer (default `1`) and receive timeout for backpressure; always `Stop` / `StopAll` to avoid leaked goroutines.
+- Tune the input buffer (default `16`) and receive timeout for backpressure; always `Stop` / `StopAll` to avoid leaked goroutines.
 - Middleware is composed once at startup; supervisor restart-frequency limits prevent restart storms.
 
 ## Development
