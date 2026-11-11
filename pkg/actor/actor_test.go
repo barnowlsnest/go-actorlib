@@ -208,7 +208,7 @@ func TestGoActorTestSuite(t *testing.T) {
 // Test actor creation and configuration
 func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 	// Act
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 
 	// Assert
 	s.NoError(err)
@@ -222,7 +222,7 @@ func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 
 func (s *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
 	// Act
-	actor, err := New[*TestEntity]()
+	actor, err := New[TestEntity]()
 
 	// Assert
 	s.Error(err)
@@ -236,8 +236,8 @@ func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSiz
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithInputBufferSize[*TestEntity](bufferSize),
+		WithProvider[TestEntity](s.provider),
+		WithInputBufferSize[TestEntity](bufferSize),
 	)
 
 	// Assert
@@ -251,8 +251,8 @@ func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() 
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithReceiveTimeout[*TestEntity](timeout),
+		WithProvider[TestEntity](s.provider),
+		WithReceiveTimeout[TestEntity](timeout),
 	)
 
 	// Assert
@@ -263,8 +263,8 @@ func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() 
 func (s *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 	)
 
 	// Assert
@@ -274,7 +274,7 @@ func (s *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
 
 func (s *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
 	// Act
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 
 	// Assert
 	s.NoError(err)
@@ -285,8 +285,8 @@ func (s *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
 func (s *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 	)
 	s.NoError(err)
 
@@ -311,7 +311,7 @@ func (s *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
 func (s *GoActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
 	// Arrange - Create a provider that returns nil
 	nilProvider := &TestEntityProvider{entity: nil}
-	actor, err := New(WithProvider[*TestEntity](nilProvider))
+	actor, err := New(WithProvider[TestEntity](nilProvider))
 	s.NoError(err)
 
 	// Act
@@ -326,7 +326,7 @@ func (s *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError()
 	// Arrange
 	nonProvidableEntity := NewTestEntity("test", false)
 	nonProvidableProvider := NewTestEntityProvider(nonProvidableEntity)
-	actor, err := New(WithProvider[*TestEntity](nonProvidableProvider))
+	actor, err := New(WithProvider[TestEntity](nonProvidableProvider))
 	s.NoError(err)
 
 	// Act
@@ -340,8 +340,8 @@ func (s *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError()
 func (s *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 	)
 	s.NoError(err)
 
@@ -366,7 +366,7 @@ func (s *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 
 func (s *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	// Act
@@ -378,7 +378,7 @@ func (s *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
 
 func (s *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	// Act
@@ -391,7 +391,7 @@ func (s *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
 
 func (s *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -409,7 +409,7 @@ func (s *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
 
 func (s *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContextError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	s.cancel() // Cancel context
@@ -425,7 +425,7 @@ func (s *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContex
 // Test message receiving and processing
 func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfully() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -457,7 +457,7 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 
 func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -472,7 +472,7 @@ func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 }
 
 func (s *GoActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Receive(s.ctx, NewTestCommand("test-cmd", nil))
@@ -482,7 +482,7 @@ func (s *GoActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
 
 func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -508,9 +508,9 @@ func (s *GoActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast
 	for _, timeout := range []time.Duration{0, time.Second} {
 		// Arrange - mailbox has room, so only the ctx check can reject the send
 		actor, err := New(
-			WithProvider[*TestEntity](s.provider),
-			WithInputBufferSize[*TestEntity](128),
-			WithReceiveTimeout[*TestEntity](timeout),
+			WithProvider[TestEntity](s.provider),
+			WithInputBufferSize[TestEntity](128),
+			WithReceiveTimeout[TestEntity](timeout),
 		)
 		s.NoError(err)
 		s.NoError(actor.Start(s.ctx))
@@ -540,9 +540,9 @@ func (s *GoActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast
 func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 	// Arrange - zero timeout means no timeout
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithInputBufferSize[*TestEntity](2),
-		WithReceiveTimeout[*TestEntity](0), // No timeout
+		WithProvider[TestEntity](s.provider),
+		WithInputBufferSize[TestEntity](2),
+		WithReceiveTimeout[TestEntity](0), // No timeout
 	)
 	s.NoError(err)
 
@@ -567,8 +567,8 @@ func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 	)
 	s.NoError(err)
 
@@ -621,8 +621,8 @@ func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	panicHooks := &PanicHooks{TestHooks: baseHooks}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](panicHooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](panicHooks),
 	)
 	s.NoError(err)
 
@@ -643,7 +643,7 @@ func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 
 func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
 	// Arrange
-	actor, err := StartNew(s.ctx, 100*time.Millisecond, WithProvider[*TestEntity](s.provider))
+	actor, err := StartNew(s.ctx, 100*time.Millisecond, WithProvider[TestEntity](s.provider))
 	s.Require().NoError(err)
 
 	panicCommand := NewTestCommand("panic-cmd", func(_ context.Context, _ *TestEntity) {
@@ -665,8 +665,8 @@ func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
 func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldNotProcessQueuedCommands() {
 	// Arrange
 	actor, err := StartNew(s.ctx, 100*time.Millisecond,
-		WithProvider[*TestEntity](s.provider),
-		WithInputBufferSize[*TestEntity](4),
+		WithProvider[TestEntity](s.provider),
+		WithInputBufferSize[TestEntity](4),
 	)
 	s.Require().NoError(err)
 
@@ -697,8 +697,8 @@ func (s *GoActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
 	panicHooks := &PanicHooks{TestHooks: NewTestHooks()}
 
 	actor, err := StartNew(s.ctx, 100*time.Millisecond,
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](panicHooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](panicHooks),
 	)
 	s.Require().NoError(err)
 
@@ -715,8 +715,8 @@ func (s *GoActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
 func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
 	// Arrange
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 	)
 	s.NoError(err)
 
@@ -751,7 +751,7 @@ func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully
 // Test state transitions
 func (s *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	// Assert initial state
@@ -775,7 +775,7 @@ func (s *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 
 func (s *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	// Act
@@ -787,7 +787,7 @@ func (s *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
 
 func (s *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	// Act
@@ -800,7 +800,7 @@ func (s *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError()
 // Test concurrent access
 func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -853,7 +853,7 @@ func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 
 func (s *GoActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
 	// Arrange
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
 	err = actor.Start(s.ctx)
@@ -898,7 +898,7 @@ func BenchmarkGoActor_CreateAndStart(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		actor, err := New(WithProvider[*TestEntity](provider))
+		actor, err := New(WithProvider[TestEntity](provider))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -923,7 +923,7 @@ func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
 
-	actor, err := New(WithProvider[*TestEntity](provider))
+	actor, err := New(WithProvider[TestEntity](provider))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -959,7 +959,7 @@ func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
 
-	actor, err := New(WithProvider[*TestEntity](provider))
+	actor, err := New(WithProvider[TestEntity](provider))
 	if err != nil {
 		b.Fatal(err)
 	}

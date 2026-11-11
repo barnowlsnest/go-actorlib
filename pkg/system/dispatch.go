@@ -19,7 +19,7 @@ import (
 //   - The name is empty ([ErrActorNameEmpty])
 //   - The ref is nil ([ErrActorNilRef])
 //   - The name is already registered ([ErrActorNameDuplicate])
-func Register[T actor.Entity](s *ActorSystem, name string, ref *actorref.Ref[T]) error {
+func Register[T any](s *ActorSystem, name string, ref *actorref.Ref[T]) error {
 	if ref == nil {
 		return ErrActorNilRef
 	}
@@ -42,7 +42,7 @@ func Register[T actor.Entity](s *ActorSystem, name string, ref *actorref.Ref[T])
 //   - The actor name is not found ([ErrActorNotFound])
 //   - The command type does not match the actor's entity type ([ErrCommandTypeMismatch])
 //   - The underlying actor send fails (e.g., buffer full, actor stopped)
-func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd actor.Executable[T]) error {
+func Send[T any](s *ActorSystem, ctx context.Context, name string, cmd actor.Executable[T]) error {
 	return s.send(ctx, name, cmd)
 }
 
@@ -57,7 +57,7 @@ func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd 
 //
 // Returns the command result and nil on success, or the zero value of R and an error on failure.
 // Timeout errors are [ask.ErrAskTimeout] (also available as [ErrAskTimeout]).
-func Ask[T actor.Entity, R any](
+func Ask[T, R any](
 	s *ActorSystem,
 	ctx context.Context,
 	name string,

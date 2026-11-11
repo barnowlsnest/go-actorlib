@@ -15,7 +15,7 @@ import (
 //
 // Returns the actor reference or an error if any step fails.
 // On registration failure, the actor is stopped so the system state is unchanged.
-func Spawn[T actor.Entity](
+func Spawn[T any, PT actor.EntityPtr[T]](
 	s *ActorSystem,
 	ctx context.Context,
 	name string,
@@ -27,7 +27,7 @@ func Spawn[T actor.Entity](
 	allOpts = append(allOpts, actor.WithProvider(provider), actor.WithName[T](name))
 	allOpts = append(allOpts, opts...)
 
-	a, err := actor.StartNew(ctx, readyTimeout, allOpts...)
+	a, err := actor.StartNew[T, PT](ctx, readyTimeout, allOpts...)
 	if err != nil {
 		return nil, err
 	}

@@ -39,7 +39,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,14 +88,24 @@ type (
 		IsProvidable() bool
 	}
 
+	// EntityPtr constrains PT to *T and requires *T to implement [Entity].
+	//
+	// It lets actors be parameterized by the entity's base type (Actor[Counter])
+	// while the actor always manages a *T. Constructors take it as a trailing
+	// type parameter that is inferred from T, so callers never spell it out.
+	EntityPtr[T any] interface {
+		*T
+		Entity
+	}
+
 	// Executable defines the interface for commands that actors can execute.
 	//
 	// This generic interface ensures type safety by binding commands to specific
 	// entity types. The actor system executes commands implementing this interface asynchronously.
-	Executable[T Entity] interface {
+	Executable[T any] interface {
 		// Execute performs the command operation on the provided entity.
 		// The context can be used for cancellation and timeout control.
-		Execute(context.Context, T)
+		Execute(context.Context, *T)
 	}
 
 	// Cancelable is an optional interface for executables that must be notified
@@ -149,15 +158,15 @@ type (
 	//
 	// This generic interface allows actors to obtain their managed entities
 	// in a type-safe manner during initialization.
-	EntityProvider[T Entity] interface {
+	EntityProvider[T any] interface {
 		// Provide returns the entity instance that the actor will manage.
 		// This method is called once during actor startup.
-		Provide() T
+		Provide() *T
 	}
 
 	// Actor is a generic actor implementation that processes commands asynchronously.
 	//
-	// Actor manages an entity of type T and processes Executable[T] commands
+	// Actor manages an entity of type *T and processes Executable[T] commands
 	// in a dedicated goroutine. It provides thread-safe state management,
 	// configurable timeouts, and lifecycle hooks for monitoring.
 	//
@@ -167,7 +176,7 @@ type (
 	//   - Asynchronous communication through message passing
 	//   - Supervision and error handling through hooks
 	//   - Dynamic behavior change via Become/Unbecome
-	Actor[T Entity] struct {
+	Actor[T any] struct {
 		receiveTimeout time.Duration
 		inputBufSize   int
 		state          uint64
@@ -185,9 +194,10 @@ type (
 
 		starting atomic.Bool // set by the Start call that owns the loop goroutine
 
-		hooks    Hooks
-		provider EntityProvider[T]
-		name     string
+		hooks      Hooks
+		provider   EntityProvider[T]
+		providable func(*T) bool // (*T).IsProvidable, bound by New via EntityPtr
+		name       string
 
 		middleware []Middleware[T]
 		handler    HandlerFunc[T]
@@ -199,7 +209,7 @@ type (
 	//
 	// Options follow the functional options pattern, allowing flexible
 	// and extensible actor configuration.
-	GoActorOption[T Entity] func(*Actor[T]) *Actor[T]
+	GoActorOption[T any] func(*Actor[T]) *Actor[T]
 )
 
 // defaultInputBufSize is the mailbox capacity when WithInputBufferSize is not set.
@@ -219,10 +229,11 @@ const defaultInputBufSize = 16
 // If no hooks are provided, a no-op implementation is used.
 //
 // Returns an error if the provider is nil or if any configuration is invalid.
-func New[T Entity](opts ...GoActorOption[T]) (*Actor[T], error) {
+func New[T any, PT EntityPtr[T]](opts ...GoActorOption[T]) (*Actor[T], error) {
 	actor := &Actor[T]{
 		inputBufSize:   defaultInputBufSize,
 		receiveTimeout: 5 * time.Second, // default receive timeout
+		providable:     func(e *T) bool { return PT(e).IsProvidable() },
 	}
 
 	for _, opt := range opts {
@@ -432,15 +443,7 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 
 	entity := a.provider.Provide()
 
-	// Check if the entity is nil using reflection
-	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
-	rv := reflect.ValueOf(entity)
-	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
-		a.starting.Store(false) // allow a retry after a failed Start
-		return ErrActorNilEntity
-	}
-
-	if !entity.IsProvidable() {
+	if entity == nil || !a.providable(entity) {
 		a.starting.Store(false) // allow a retry after a failed Start
 		return ErrActorNilEntity
 	}
@@ -452,12 +455,12 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 		name:     a.name,
 	}
 
-	func(e T) {
+	func(e *T) {
 		defer a.catchPanic()
 		a.hooks.BeforeStart(e)
 	}(entity)
 
-	go func(ctx context.Context, entity T) {
+	go func(ctx context.Context, entity *T) {
 		defer close(a.done)
 		defer a.drain()
 
@@ -490,7 +493,7 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 // receive on input plus two non-blocking receives on ctx.Done and stop, which
 // are lock-free while those channels are open. The blocking select runs only
 // when the mailbox is empty.
-func (a *Actor[T]) loop(ctx, actorScopedCtx context.Context, entity T) {
+func (a *Actor[T]) loop(ctx, actorScopedCtx context.Context, entity *T) {
 	ctxDone := ctx.Done() // nil for a non-cancelable ctx: never ready
 
 	for {
@@ -518,7 +521,7 @@ func (a *Actor[T]) loop(ctx, actorScopedCtx context.Context, entity T) {
 
 // next returns the next queued command, blocking while the mailbox is empty.
 // It returns false once the loop must exit because ctx is done or Stop was called.
-func (a *Actor[T]) next(ctx context.Context, ctxDone <-chan struct{}, entity T) (Executable[T], bool) {
+func (a *Actor[T]) next(ctx context.Context, ctxDone <-chan struct{}, entity *T) (Executable[T], bool) {
 	// Fast path: a single-channel non-blocking receive takes only the mailbox lock.
 	select {
 	case e := <-a.input:
@@ -542,7 +545,7 @@ func (a *Actor[T]) next(ctx context.Context, ctxDone <-chan struct{}, entity T) 
 // dequeued. If so, it records the terminal state and cancels e instead of
 // running it, so commands still queued at Stop are canceled rather than run
 // (see the TestDrain_* tests).
-func (a *Actor[T]) interrupted(ctx context.Context, ctxDone <-chan struct{}, e Executable[T], entity T) bool {
+func (a *Actor[T]) interrupted(ctx context.Context, ctxDone <-chan struct{}, e Executable[T], entity *T) bool {
 	select {
 	case <-ctxDone:
 		// Record the terminal state first: Cancel may call back into
@@ -565,7 +568,7 @@ func (a *Actor[T]) interrupted(ctx context.Context, ctxDone <-chan struct{}, e E
 }
 
 // beforeStop runs the BeforeStop hook, recovering a panic in it.
-func (a *Actor[T]) beforeStop(entity T) {
+func (a *Actor[T]) beforeStop(entity *T) {
 	defer a.catchPanic()
 	a.hooks.BeforeStop(entity)
 }
@@ -618,7 +621,7 @@ func (a *Actor[T]) Stop(timeout time.Duration) error {
 //
 // A buffer size of 0 creates an unbuffered channel, which means senders
 // will block until the actor is ready to process the message.
-func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
+func WithInputBufferSize[T any](inputBufSize int) GoActorOption[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.inputBufSize = inputBufSize
 		return actor
@@ -632,7 +635,7 @@ func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
 //
 // If set to a positive duration, Receive will return an error if the message
 // cannot be queued within that timeframe. The default timeout is 5 seconds.
-func WithReceiveTimeout[T Entity](timeout time.Duration) GoActorOption[T] {
+func WithReceiveTimeout[T any](timeout time.Duration) GoActorOption[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.receiveTimeout = timeout
 		return actor
@@ -646,7 +649,7 @@ func WithReceiveTimeout[T Entity](timeout time.Duration) GoActorOption[T] {
 // created without a provider.
 //
 // The provider's Provide() method is called once during actor startup.
-func WithProvider[T Entity](provider EntityProvider[T]) GoActorOption[T] {
+func WithProvider[T any](provider EntityProvider[T]) GoActorOption[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.provider = provider
 		return actor
@@ -655,7 +658,7 @@ func WithProvider[T Entity](provider EntityProvider[T]) GoActorOption[T] {
 
 // WithName configures the actor's name.
 // The name is available via GoActorContext.Name() during message processing.
-func WithName[T Entity](name string) GoActorOption[T] {
+func WithName[T any](name string) GoActorOption[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.name = name
 		return actor
@@ -680,7 +683,7 @@ func (a *Actor[T]) Done() <-chan struct{} {
 //
 // All hook methods should be non-blocking and handle errors gracefully,
 // as they run within the actor's critical execution paths.
-func WithHooks[T Entity](hooks Hooks) GoActorOption[T] {
+func WithHooks[T any](hooks Hooks) GoActorOption[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.hooks = hooks
 		return actor

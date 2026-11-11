@@ -8,7 +8,7 @@
 //
 // Example usage:
 //
-//	mb := mailbox.NewPriority[*MyEntity](10)
+//	mb := mailbox.NewPriority[MyEntity](10)
 //	mb.Push(myCommand, mailbox.High)
 //	msg, ok := mb.Pop()
 package mailbox
@@ -40,7 +40,7 @@ const (
 )
 
 // message wraps an executable with its priority for heap ordering.
-type message[T actor.Entity] struct {
+type message[T any] struct {
 	executable actor.Executable[T]
 	priority   Priority
 	seq        uint64 // insertion order for stable sorting within same priority
@@ -49,7 +49,7 @@ type message[T actor.Entity] struct {
 // PriorityMailbox is a thread-safe priority queue for actor messages.
 // Messages with lower Priority values are dequeued first.
 // Within the same priority, FIFO order is maintained.
-type PriorityMailbox[T actor.Entity] struct {
+type PriorityMailbox[T any] struct {
 	mu      sync.Mutex
 	heap    *tree.Heap[message[T]]
 	seq     uint64
@@ -60,7 +60,7 @@ type PriorityMailbox[T actor.Entity] struct {
 
 // NewPriority creates a new PriorityMailbox with the given maximum size.
 // The notify channel can be used to receive a signal when messages are available.
-func NewPriority[T actor.Entity](maxSize int) *PriorityMailbox[T] {
+func NewPriority[T any](maxSize int) *PriorityMailbox[T] {
 	return &PriorityMailbox[T]{
 		heap: tree.NewHeap(func(a, b message[T]) bool {
 			if a.priority != b.priority {

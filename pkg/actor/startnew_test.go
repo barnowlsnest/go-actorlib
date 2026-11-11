@@ -44,7 +44,7 @@ func (s *StartNewTestSuite) TestStartNew_ValidProvider_ShouldReturnStartedActor(
 
 func (s *StartNewTestSuite) TestStartNew_NilProvider_ShouldReturnError() {
 	// Act
-	a, err := StartNew[*TestEntity](s.ctx, 100*time.Millisecond)
+	a, err := StartNew[TestEntity](s.ctx, 100*time.Millisecond)
 
 	// Assert
 	s.Error(err)
@@ -60,8 +60,8 @@ func (s *StartNewTestSuite) TestStartNew_WithOptions_ShouldApply() {
 	// Act
 	a, err := StartNew(s.ctx, 100*time.Millisecond,
 		WithProvider(provider),
-		WithInputBufferSize[*TestEntity](10),
-		WithName[*TestEntity]("my-actor"),
+		WithInputBufferSize[TestEntity](10),
+		WithName[TestEntity]("my-actor"),
 	)
 
 	// Assert

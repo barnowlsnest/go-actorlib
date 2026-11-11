@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
 )
@@ -40,7 +39,7 @@ import (
 //   - Delegate function errors propagated via [command.Command.Error]
 //   - [context.Canceled] or [context.DeadlineExceeded] if ctx is done
 //   - [ErrAskTimeout] if the timeout expires before a result is available
-func New[E actor.Entity, R any](
+func New[E, R any](
 	ctx context.Context,
 	ref *actorref.Ref[E],
 	fn command.DelegateFn[E, R],
@@ -57,7 +56,7 @@ func New[E actor.Entity, R any](
 }
 
 // Await waits for a command result until it completes, ctx is done, or timeout elapses.
-func Await[E actor.Entity, R any](
+func Await[E, R any](
 	ctx context.Context,
 	cmd *command.Command[E, R],
 	timeout time.Duration,

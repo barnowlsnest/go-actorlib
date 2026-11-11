@@ -29,38 +29,38 @@ func TestPriorityMailboxTestSuite(t *testing.T) {
 }
 
 func (s *PriorityMailboxTestSuite) TestNewPriority_ShouldCreateEmptyMailbox() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	s.True(mb.IsEmpty())
 	s.Equal(0, mb.Size())
 }
 
 func (s *PriorityMailboxTestSuite) TestPush_ShouldAddMessage() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	ok := mb.Push(&testCommand{name: "test"}, Normal)
 	s.True(ok)
 	s.Equal(1, mb.Size())
 }
 
 func (s *PriorityMailboxTestSuite) TestPush_Full_ShouldReturnFalse() {
-	mb := NewPriority[*testEntity](1)
+	mb := NewPriority[testEntity](1)
 	s.True(mb.Push(&testCommand{name: "a"}, Normal))
 	s.False(mb.Push(&testCommand{name: "b"}, Normal))
 }
 
 func (s *PriorityMailboxTestSuite) TestPush_Closed_ShouldReturnFalse() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	mb.Close()
 	s.False(mb.Push(&testCommand{name: "a"}, Normal))
 }
 
 func (s *PriorityMailboxTestSuite) TestPop_Empty_ShouldReturnFalse() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	_, ok := mb.Pop()
 	s.False(ok)
 }
 
 func (s *PriorityMailboxTestSuite) TestPriority_SystemBeforeNormal() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	mb.Push(&testCommand{name: "normal"}, Normal)
 	mb.Push(&testCommand{name: "system"}, System)
 	mb.Push(&testCommand{name: "low"}, Low)
@@ -79,7 +79,7 @@ func (s *PriorityMailboxTestSuite) TestPriority_SystemBeforeNormal() {
 }
 
 func (s *PriorityMailboxTestSuite) TestPriority_FIFOWithinSamePriority() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	mb.Push(&testCommand{name: "first"}, Normal)
 	mb.Push(&testCommand{name: "second"}, Normal)
 	mb.Push(&testCommand{name: "third"}, Normal)
@@ -95,7 +95,7 @@ func (s *PriorityMailboxTestSuite) TestPriority_FIFOWithinSamePriority() {
 }
 
 func (s *PriorityMailboxTestSuite) TestNotify_ShouldSignalOnPush() {
-	mb := NewPriority[*testEntity](10)
+	mb := NewPriority[testEntity](10)
 	mb.Push(&testCommand{name: "test"}, Normal)
 
 	select {
@@ -107,7 +107,7 @@ func (s *PriorityMailboxTestSuite) TestNotify_ShouldSignalOnPush() {
 }
 
 func (s *PriorityMailboxTestSuite) TestConcurrentPushPop_ShouldBeSafe() {
-	mb := NewPriority[*testEntity](1000)
+	mb := NewPriority[testEntity](1000)
 	var wg sync.WaitGroup
 
 	// Concurrent pushes
@@ -130,8 +130,8 @@ func (s *PriorityMailboxTestSuite) TestConcurrentPushPop_ShouldBeSafe() {
 
 // Verify that PriorityMailbox works with the actor.Executable interface
 func (s *PriorityMailboxTestSuite) TestPriorityMailbox_CompatibleWithExecutable() {
-	mb := NewPriority[*testEntity](10)
-	var cmd actor.Executable[*testEntity] = &testCommand{name: "typed"}
+	mb := NewPriority[testEntity](10)
+	var cmd actor.Executable[testEntity] = &testCommand{name: "typed"}
 	ok := mb.Push(cmd, High)
 	s.True(ok)
 

@@ -12,14 +12,14 @@ import (
 // startWithFullMailbox starts an actor with a 1-slot mailbox, occupies the loop
 // with a blocking command and fills the mailbox, so the next Receive must take
 // the slow (blocking) path. Closing the returned channel unblocks the actor.
-func startWithFullMailbox(t *testing.T, receiveTimeout time.Duration) (a *Actor[*TestEntity], release chan struct{}) {
+func startWithFullMailbox(t *testing.T, receiveTimeout time.Duration) (a *Actor[TestEntity], release chan struct{}) {
 	t.Helper()
 
 	var err error
 	a, err = StartNew(context.Background(), time.Second,
-		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
-		WithInputBufferSize[*TestEntity](1),
-		WithReceiveTimeout[*TestEntity](receiveTimeout),
+		WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
+		WithInputBufferSize[TestEntity](1),
+		WithReceiveTimeout[TestEntity](receiveTimeout),
 	)
 	require.NoError(t, err)
 

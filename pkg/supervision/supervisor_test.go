@@ -646,7 +646,7 @@ func (b blockCommand) Execute(context.Context, *supervisedEntity) {
 // overlapSpec flags a start that happens while the previous instance is still running.
 type overlapSpec struct {
 	mu      sync.Mutex
-	last    *actorref.Ref[*supervisedEntity]
+	last    *actorref.Ref[supervisedEntity]
 	starts  atomic.Int32
 	overlap atomic.Bool
 }
@@ -678,7 +678,7 @@ func (o *overlapSpec) Start(ctx context.Context) (ChildRef, error) {
 	return ref, nil
 }
 
-func (o *overlapSpec) current() *actorref.Ref[*supervisedEntity] {
+func (o *overlapSpec) current() *actorref.Ref[supervisedEntity] {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.last

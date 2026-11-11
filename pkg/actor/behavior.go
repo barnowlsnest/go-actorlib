@@ -3,12 +3,12 @@ package actor
 // BehaviorStack manages a stack of handler functions for dynamic behavior changes.
 // It is used internally by Actor to implement Become/Unbecome semantics.
 // Only accessed from within the actor's goroutine, so no synchronization is needed.
-type BehaviorStack[T Entity] struct {
+type BehaviorStack[T any] struct {
 	stack []HandlerFunc[T]
 }
 
 // newBehaviorStack creates a new BehaviorStack with the given initial handler.
-func newBehaviorStack[T Entity](initial HandlerFunc[T]) *BehaviorStack[T] {
+func newBehaviorStack[T any](initial HandlerFunc[T]) *BehaviorStack[T] {
 	return &BehaviorStack[T]{
 		stack: []HandlerFunc[T]{initial},
 	}

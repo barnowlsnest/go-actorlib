@@ -23,8 +23,8 @@ func FuzzActorLifecycle(f *testing.F) {
 
 		a, err := New(
 			WithProvider(provider),
-			WithInputBufferSize[*TestEntity](5),
-			WithReceiveTimeout[*TestEntity](10*time.Millisecond),
+			WithInputBufferSize[TestEntity](5),
+			WithReceiveTimeout[TestEntity](10*time.Millisecond),
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -73,8 +73,8 @@ func FuzzConcurrentStopAndSend(f *testing.F) {
 
 		a, err := New(
 			WithProvider(provider),
-			WithInputBufferSize[*TestEntity](100),
-			WithReceiveTimeout[*TestEntity](10*time.Millisecond),
+			WithInputBufferSize[TestEntity](100),
+			WithReceiveTimeout[TestEntity](10*time.Millisecond),
 		)
 		if err != nil {
 			t.Fatal(err)

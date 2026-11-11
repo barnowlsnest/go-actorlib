@@ -21,11 +21,11 @@ import (
 //	log := logger.New(logger.Config{Level: logger.DebugLevel})
 //	actor.New(
 //		actor.WithProvider(provider),
-//		actor.WithMiddleware(middleware.Logging[*MyEntity](log)),
+//		actor.WithMiddleware(middleware.Logging[MyEntity](log)),
 //	)
-func Logging[T actor.Entity](log *logger.Logger) actor.Middleware[T] {
+func Logging[T any](log *logger.Logger) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
-		return func(ctx context.Context, e actor.Executable[T], entity T) {
+		return func(ctx context.Context, e actor.Executable[T], entity *T) {
 			actorName := ""
 			if ac := actor.GetGoActorContext[T](ctx); ac != nil {
 				actorName = ac.Name()

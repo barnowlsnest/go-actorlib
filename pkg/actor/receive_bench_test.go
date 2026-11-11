@@ -12,11 +12,11 @@ type noopBenchCommand struct{}
 
 func (noopBenchCommand) Execute(context.Context, *TestEntity) {}
 
-func startBenchActor(b *testing.B, opts ...GoActorOption[*TestEntity]) *Actor[*TestEntity] {
+func startBenchActor(b *testing.B, opts ...GoActorOption[TestEntity]) *Actor[TestEntity] {
 	b.Helper()
 
 	provider := NewTestEntityProvider(NewTestEntity("bench", true))
-	opts = append([]GoActorOption[*TestEntity]{WithProvider[*TestEntity](provider)}, opts...)
+	opts = append([]GoActorOption[TestEntity]{WithProvider[TestEntity](provider)}, opts...)
 
 	a, err := StartNew(context.Background(), time.Second, opts...)
 	if err != nil {
@@ -32,7 +32,7 @@ func startBenchActor(b *testing.B, opts ...GoActorOption[*TestEntity]) *Actor[*T
 // free capacity (the common case for a sized mailbox), with the default 5s
 // receive timeout.
 func BenchmarkReceive_MailboxHasRoom(b *testing.B) {
-	a := startBenchActor(b, WithInputBufferSize[*TestEntity](1024))
+	a := startBenchActor(b, WithInputBufferSize[TestEntity](1024))
 	ctx := context.Background()
 	cmd := noopBenchCommand{}
 
@@ -46,7 +46,7 @@ func BenchmarkReceive_MailboxHasRoom(b *testing.B) {
 
 // BenchmarkReceive_MailboxHasRoom_NoTimeout is the same with receiveTimeout = 0.
 func BenchmarkReceive_MailboxHasRoom_NoTimeout(b *testing.B) {
-	a := startBenchActor(b, WithInputBufferSize[*TestEntity](1024), WithReceiveTimeout[*TestEntity](0))
+	a := startBenchActor(b, WithInputBufferSize[TestEntity](1024), WithReceiveTimeout[TestEntity](0))
 	ctx := context.Background()
 	cmd := noopBenchCommand{}
 
@@ -60,7 +60,7 @@ func BenchmarkReceive_MailboxHasRoom_NoTimeout(b *testing.B) {
 
 // BenchmarkReceive_ParallelSenders measures many goroutines sending to one actor.
 func BenchmarkReceive_ParallelSenders(b *testing.B) {
-	a := startBenchActor(b, WithInputBufferSize[*TestEntity](1024))
+	a := startBenchActor(b, WithInputBufferSize[TestEntity](1024))
 	ctx := context.Background()
 	cmd := noopBenchCommand{}
 

@@ -63,8 +63,8 @@ type GoAskTestSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	entity *TestEntity
-	actor  *actor.Actor[*TestEntity]
-	ref    *actorref.Ref[*TestEntity]
+	actor  *actor.Actor[TestEntity]
+	ref    *actorref.Ref[TestEntity]
 }
 
 func (s *GoAskTestSuite) SetupTest() {
@@ -75,7 +75,7 @@ func (s *GoAskTestSuite) SetupTest() {
 	var err error
 	s.actor, err = actor.New(
 		actor.WithProvider(provider),
-		actor.WithInputBufferSize[*TestEntity](10),
+		actor.WithInputBufferSize[TestEntity](10),
 	)
 	s.Require().NoError(err)
 
@@ -235,7 +235,7 @@ func BenchmarkNew_Success(b *testing.B) {
 
 	a, err := actor.New(
 		actor.WithProvider(provider),
-		actor.WithInputBufferSize[*TestEntity](10),
+		actor.WithInputBufferSize[TestEntity](10),
 	)
 	if err != nil {
 		b.Fatal(err)

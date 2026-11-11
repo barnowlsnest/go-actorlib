@@ -28,7 +28,7 @@
 //	})
 //
 //	// Send to actor (assuming myActor is already started)
-//	var myActor *actor.GoActor[*MyEntity]
+//	var myActor *actor.Actor[MyEntity]
 //	err := myActor.Receive(ctx, cmd)
 //	if err != nil {
 //		panic(err)
@@ -87,7 +87,7 @@ type (
 	// This generic function type is used to wrap operations that need to be
 	// executed on entities. It provides type safety and error handling for
 	// command implementations.
-	DelegateFn[T actor.Entity, R any] func(entity T) (R, error)
+	DelegateFn[T, R any] func(entity *T) (R, error)
 
 	// Command is a generic command implementation that executes operations on entities.
 	//
@@ -102,13 +102,19 @@ type (
 	//
 	// Results are delivered through a buffered channel accessible via Done(),
 	// while errors can be retrieved using Error().
-	Command[E actor.Entity, R any] struct {
+	Command[E, R any] struct {
 		mu         sync.Mutex
 		state      int
 		done       chan R
 		err        error
 		delegateFn DelegateFn[E, R]
 	}
+)
+
+// Compile-time checks: Command is an actor command that can be canceled when dropped.
+var (
+	_ actor.Executable[struct{}] = (*Command[struct{}, struct{}])(nil)
+	_ actor.Cancelable           = (*Command[struct{}, struct{}])(nil)
 )
 
 // New creates a new Command that will execute the provided delegate function.
@@ -118,7 +124,7 @@ type (
 // a result of type R or an error.
 //
 // The command is created in the Created state and remains so until executed.
-func New[E actor.Entity, R any](fn DelegateFn[E, R]) *Command[E, R] {
+func New[E, R any](fn DelegateFn[E, R]) *Command[E, R] {
 	return &Command[E, R]{
 		state:      Created,
 		done:       make(chan R, 1),
@@ -188,7 +194,7 @@ func (gc *Command[E, R]) State() int {
 //
 // A command runs at most once: calling Execute again, or after Cancel, does
 // nothing. The result channel is always closed exactly once.
-func (gc *Command[E, R]) Execute(ctx context.Context, entity E) {
+func (gc *Command[E, R]) Execute(ctx context.Context, entity *E) {
 	if !gc.begin() {
 		return
 	}

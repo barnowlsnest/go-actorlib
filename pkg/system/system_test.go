@@ -113,13 +113,13 @@ func TestActorSystemTestSuite(t *testing.T) {
 	suite.Run(t, new(ActorSystemTestSuite))
 }
 
-func (s *ActorSystemTestSuite) newStartedRef() (*actorref.Ref[*testEntity], *testEntity) {
+func (s *ActorSystemTestSuite) newStartedRef() (*actorref.Ref[testEntity], *testEntity) {
 	entity := newTestEntity("initial")
 	provider := &testEntityProvider{entity: entity}
 
 	a, err := actor.New(
 		actor.WithProvider(provider),
-		actor.WithInputBufferSize[*testEntity](10),
+		actor.WithInputBufferSize[testEntity](10),
 	)
 	s.Require().NoError(err)
 
@@ -179,7 +179,7 @@ func (s *ActorSystemTestSuite) TestRegister_NilRef_ShouldReturnError() {
 	sys := New()
 
 	// Act
-	err := Register[*testEntity](sys, "actor-1", nil)
+	err := Register[testEntity](sys, "actor-1", nil)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNilRef)
@@ -838,7 +838,7 @@ func BenchmarkSend(b *testing.B) {
 
 	a, err := actor.New(
 		actor.WithProvider(provider),
-		actor.WithInputBufferSize[*testEntity](1000),
+		actor.WithInputBufferSize[testEntity](1000),
 	)
 	if err != nil {
 		b.Fatal(err)
@@ -927,7 +927,7 @@ func (b blockingCmd) Execute(context.Context, *testEntity) {
 
 // spawnTimedOut spawns an actor whose Stop already timed out: state is
 // StoppedWithError while its goroutine is still running blockingCmd.
-func (s *ActorSystemTestSuite) spawnTimedOut(sys *ActorSystem) (ref *actorref.Ref[*testEntity], release chan struct{}) {
+func (s *ActorSystemTestSuite) spawnTimedOut(sys *ActorSystem) (ref *actorref.Ref[testEntity], release chan struct{}) {
 	ref, err := Spawn(sys, s.ctx, "slow", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
 	s.Require().NoError(err)
 
@@ -1006,7 +1006,7 @@ func (s *ActorSystemTestSuite) TestStopAll_WithNotRunningActorWithoutDone_Should
 
 func (s *ActorSystemTestSuite) TestStopAll_WithRegisteredButNeverStartedActor_ShouldReturnNotRunningPromptly() {
 	// Arrange
-	a, err := actor.New(actor.WithProvider[*testEntity](&testEntityProvider{entity: newTestEntity("v")}))
+	a, err := actor.New(actor.WithProvider[testEntity](&testEntityProvider{entity: newTestEntity("v")}))
 	s.Require().NoError(err)
 	ref, err := actorref.New(a)
 	s.Require().NoError(err)

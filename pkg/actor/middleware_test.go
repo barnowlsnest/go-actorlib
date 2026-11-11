@@ -43,12 +43,12 @@ func TestMiddlewareTestSuite(t *testing.T) {
 func (s *MiddlewareTestSuite) TestChain_Empty_ShouldPassThrough() {
 	// Arrange
 	var called bool
-	base := func(_ context.Context, _ Executable[*TestEntity], _ *TestEntity) {
+	base := func(_ context.Context, _ Executable[TestEntity], _ *TestEntity) {
 		called = true
 	}
 
 	// Act
-	handler := Chain[*TestEntity]()(base)
+	handler := Chain[TestEntity]()(base)
 	handler(s.ctx, NewTestCommand("test", nil), s.entity)
 
 	// Assert
@@ -58,14 +58,14 @@ func (s *MiddlewareTestSuite) TestChain_Empty_ShouldPassThrough() {
 func (s *MiddlewareTestSuite) TestChain_Single_ShouldWrapHandler() {
 	// Arrange
 	var order []string
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			order = append(order, "before")
 			next(ctx, e, entity)
 			order = append(order, "after")
 		}
 	}
-	base := func(_ context.Context, _ Executable[*TestEntity], _ *TestEntity) {
+	base := func(_ context.Context, _ Executable[TestEntity], _ *TestEntity) {
 		order = append(order, "handler")
 	}
 
@@ -80,16 +80,16 @@ func (s *MiddlewareTestSuite) TestChain_Single_ShouldWrapHandler() {
 func (s *MiddlewareTestSuite) TestChain_Multiple_ShouldExecuteInOrder() {
 	// Arrange
 	var order []string
-	makeMW := func(name string) Middleware[*TestEntity] {
-		return func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-			return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	makeMW := func(name string) Middleware[TestEntity] {
+		return func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+			return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 				order = append(order, name+"-before")
 				next(ctx, e, entity)
 				order = append(order, name+"-after")
 			}
 		}
 	}
-	base := func(_ context.Context, _ Executable[*TestEntity], _ *TestEntity) {
+	base := func(_ context.Context, _ Executable[TestEntity], _ *TestEntity) {
 		order = append(order, "handler")
 	}
 
@@ -110,8 +110,8 @@ func (s *MiddlewareTestSuite) TestChain_Multiple_ShouldExecuteInOrder() {
 func (s *MiddlewareTestSuite) TestWithMiddleware_Single_ShouldConfigure() {
 	// Arrange
 	var called atomic.Bool
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			called.Store(true)
 			next(ctx, e, entity)
 		}
@@ -119,7 +119,7 @@ func (s *MiddlewareTestSuite) TestWithMiddleware_Single_ShouldConfigure() {
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(mw),
 	)
 
@@ -140,13 +140,13 @@ func (s *MiddlewareTestSuite) TestWithMiddleware_Single_ShouldConfigure() {
 
 func (s *MiddlewareTestSuite) TestWithMiddleware_MultipleCalls_ShouldAppend() {
 	// Arrange
-	noop1 := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] { return next }
-	noop2 := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] { return next }
-	noop3 := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] { return next }
+	noop1 := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] { return next }
+	noop2 := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] { return next }
+	noop3 := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] { return next }
 
 	// Act
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(noop1),
 		WithMiddleware(noop2, noop3),
 	)
@@ -168,8 +168,8 @@ func (s *MiddlewareTestSuite) TestActor_WithMiddleware_ShouldProcessCommandsThro
 		order = append(order, v)
 	}
 
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			appendOrder("middleware-before")
 			next(ctx, e, entity)
 			appendOrder("middleware-after")
@@ -177,7 +177,7 @@ func (s *MiddlewareTestSuite) TestActor_WithMiddleware_ShouldProcessCommandsThro
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(mw),
 	)
 	s.NoError(err)
@@ -213,9 +213,9 @@ func (s *MiddlewareTestSuite) TestActor_WithMultipleMiddleware_ShouldExecuteInOr
 		order = append(order, v)
 	}
 
-	makeMW := func(name string) Middleware[*TestEntity] {
-		return func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-			return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	makeMW := func(name string) Middleware[TestEntity] {
+		return func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+			return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 				appendOrder(name + "-before")
 				next(ctx, e, entity)
 				appendOrder(name + "-after")
@@ -224,7 +224,7 @@ func (s *MiddlewareTestSuite) TestActor_WithMultipleMiddleware_ShouldExecuteInOr
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(makeMW("A"), makeMW("B")),
 		WithMiddleware(makeMW("C")),
 	)
@@ -257,8 +257,8 @@ func (s *MiddlewareTestSuite) TestActor_MultipleCommands_ShouldAllInvokeMiddlewa
 	// Arrange
 	var count int
 	var mu sync.Mutex
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			mu.Lock()
 			count++
 			mu.Unlock()
@@ -267,8 +267,8 @@ func (s *MiddlewareTestSuite) TestActor_MultipleCommands_ShouldAllInvokeMiddlewa
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithInputBufferSize[*TestEntity](10),
+		WithProvider[TestEntity](s.provider),
+		WithInputBufferSize[TestEntity](10),
 		WithMiddleware(mw),
 	)
 	s.NoError(err)
@@ -293,14 +293,14 @@ func (s *MiddlewareTestSuite) TestActor_MultipleCommands_ShouldAllInvokeMiddlewa
 
 func (s *MiddlewareTestSuite) TestMiddleware_ShortCircuit_ShouldSkipExecution() {
 	// Arrange — middleware that does not call next
-	mw := func(_ HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(_ context.Context, _ Executable[*TestEntity], _ *TestEntity) {
+	mw := func(_ HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(_ context.Context, _ Executable[TestEntity], _ *TestEntity) {
 			// intentionally not calling next
 		}
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(mw),
 	)
 	s.NoError(err)
@@ -326,14 +326,14 @@ func (s *MiddlewareTestSuite) TestMiddleware_ModifiesContext_ShouldPropagateToHa
 	var receivedVal string
 	var mu sync.Mutex
 
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			next(context.WithValue(ctx, ctxKey{}, "injected"), e, entity)
 		}
 	}
 
-	innerMW := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	innerMW := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			mu.Lock()
 			receivedVal, _ = ctx.Value(ctxKey{}).(string)
 			mu.Unlock()
@@ -342,7 +342,7 @@ func (s *MiddlewareTestSuite) TestMiddleware_ModifiesContext_ShouldPropagateToHa
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(mw, innerMW),
 	)
 	s.NoError(err)
@@ -363,15 +363,15 @@ func (s *MiddlewareTestSuite) TestMiddleware_ModifiesContext_ShouldPropagateToHa
 
 func (s *MiddlewareTestSuite) TestMiddleware_PanicInMiddleware_ShouldBeCaughtByActor() {
 	// Arrange
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(_ context.Context, _ Executable[*TestEntity], _ *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(_ context.Context, _ Executable[TestEntity], _ *TestEntity) {
 			panic("middleware panic")
 		}
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 		WithMiddleware(mw),
 	)
 	s.NoError(err)
@@ -392,15 +392,15 @@ func (s *MiddlewareTestSuite) TestMiddleware_PanicInMiddleware_ShouldBeCaughtByA
 
 func (s *MiddlewareTestSuite) TestMiddleware_PanicWithoutRecovery_ShouldPropagateToCatchPanic() {
 	// Arrange — a panic inside the command (after middleware) should still be caught
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			next(ctx, e, entity)
 		}
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
-		WithHooks[*TestEntity](s.hooks),
+		WithProvider[TestEntity](s.provider),
+		WithHooks[TestEntity](s.hooks),
 		WithMiddleware(mw),
 	)
 	s.NoError(err)
@@ -421,8 +421,8 @@ func (s *MiddlewareTestSuite) TestMiddleware_PanicWithoutRecovery_ShouldPropagat
 
 func (s *MiddlewareTestSuite) TestMiddleware_RecoveryMiddleware_ShouldPreventActorPanic() {
 	// Arrange — recovery middleware that catches panics
-	recoveryMW := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	recoveryMW := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			defer func() {
 				recover() //nolint:errcheck // intentional recovery in test
 			}()
@@ -431,7 +431,7 @@ func (s *MiddlewareTestSuite) TestMiddleware_RecoveryMiddleware_ShouldPreventAct
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](s.provider),
+		WithProvider[TestEntity](s.provider),
 		WithMiddleware(recoveryMW),
 	)
 	s.NoError(err)
@@ -466,7 +466,7 @@ func (s *MiddlewareTestSuite) TestMiddleware_RecoveryMiddleware_ShouldPreventAct
 
 func (s *MiddlewareTestSuite) TestActor_WithoutMiddleware_ShouldHaveZeroOverhead() {
 	// Arrange — no middleware configured
-	actor, err := New(WithProvider[*TestEntity](s.provider))
+	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 	s.NoError(actor.Start(s.ctx))
 	s.NoError(actor.WaitReady(s.ctx, 100*time.Millisecond))
@@ -492,7 +492,7 @@ func BenchmarkGoActor_NoMiddleware(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 
-	actor, err := New(WithProvider[*TestEntity](provider))
+	actor, err := New(WithProvider[TestEntity](provider))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -525,14 +525,14 @@ func BenchmarkGoActor_SingleMiddleware(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 
-	mw := func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-		return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	mw := func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+		return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 			next(ctx, e, entity)
 		}
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](provider),
+		WithProvider[TestEntity](provider),
 		WithMiddleware(mw),
 	)
 	if err != nil {
@@ -567,21 +567,21 @@ func BenchmarkGoActor_FiveMiddlewares(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 
-	makeMW := func() Middleware[*TestEntity] {
-		return func(next HandlerFunc[*TestEntity]) HandlerFunc[*TestEntity] {
-			return func(ctx context.Context, e Executable[*TestEntity], entity *TestEntity) {
+	makeMW := func() Middleware[TestEntity] {
+		return func(next HandlerFunc[TestEntity]) HandlerFunc[TestEntity] {
+			return func(ctx context.Context, e Executable[TestEntity], entity *TestEntity) {
 				next(ctx, e, entity)
 			}
 		}
 	}
 
-	mws := make([]Middleware[*TestEntity], 5)
+	mws := make([]Middleware[TestEntity], 5)
 	for i := range mws {
 		mws[i] = makeMW()
 	}
 
 	actor, err := New(
-		WithProvider[*TestEntity](provider),
+		WithProvider[TestEntity](provider),
 		WithMiddleware(mws...),
 	)
 	if err != nil {
