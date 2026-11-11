@@ -42,6 +42,7 @@ type Option func(*Queue)
 
 // WithCapacity sets the maximum number of letters retained in the queue.
 // When the capacity is reached, the oldest letter is discarded.
+// A capacity of zero or less retains no letters; handlers are still notified.
 // Default is 1000.
 func WithCapacity(capacity int) Option {
 	return func(q *Queue) {
@@ -57,6 +58,7 @@ func New(opts ...Option) *Queue {
 	for _, opt := range opts {
 		opt(q)
 	}
+	q.capacity = max(q.capacity, 0)
 	q.letters = make([]Letter, 0, q.capacity)
 	return q
 }
@@ -72,11 +74,13 @@ func (q *Queue) OnDeadLetter(h Handler) {
 // Publish adds a dead letter to the queue and notifies all handlers.
 func (q *Queue) Publish(l Letter) {
 	q.mu.Lock()
-	// Evict oldest if at capacity
-	if len(q.letters) >= q.capacity {
-		q.letters = q.letters[1:]
+	if q.capacity > 0 {
+		// Evict oldest if at capacity
+		if len(q.letters) >= q.capacity {
+			q.letters = q.letters[1:]
+		}
+		q.letters = append(q.letters, l)
 	}
-	q.letters = append(q.letters, l)
 
 	handlers := make([]Handler, len(q.handlers))
 	copy(handlers, q.handlers)
