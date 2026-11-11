@@ -241,9 +241,16 @@ func (s *ActorSystem) Count() int {
 // that timed out (StoppedWithError) while its goroutine is still running. When
 // m exposes Done (as actorref.Ref does), wait for it within timeout. Otherwise
 // only states set after the goroutine has finished count as stopped.
+//
+// A never-started actor (Initialized) has no goroutine, so Done never closes:
+// its error is returned immediately rather than after waiting out the timeout.
 func stopManaged(m ManagedActor, timeout time.Duration) error {
 	err := m.Stop(timeout)
 	if err == nil || !errors.Is(err, actor.ErrActorNotRunning) {
+		return err
+	}
+
+	if m.State() == actor.Initialized {
 		return err
 	}
 

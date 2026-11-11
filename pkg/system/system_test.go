@@ -1002,3 +1002,22 @@ func (s *ActorSystemTestSuite) TestStopAll_WithNotRunningActorWithoutDone_Should
 		}
 	}
 }
+
+func (s *ActorSystemTestSuite) TestStopAll_WithRegisteredButNeverStartedActor_ShouldReturnNotRunningPromptly() {
+	// Arrange
+	a, err := actor.New(actor.WithProvider[*testEntity](&testEntityProvider{entity: newTestEntity("v")}))
+	s.Require().NoError(err)
+	ref, err := actorref.New(a)
+	s.Require().NoError(err)
+	sys := New()
+	s.Require().NoError(Register(sys, "unstarted", ref))
+
+	// Act
+	start := time.Now()
+	err = sys.StopAll(time.Second)
+
+	// Assert
+	s.Less(time.Since(start), 500*time.Millisecond, "StopAll waited for Done of an actor that never started")
+	s.ErrorIs(err, actor.ErrActorNotRunning)
+	s.NotErrorIs(err, actor.ErrActorGracefulStopTimeout)
+}

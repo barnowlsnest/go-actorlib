@@ -390,13 +390,14 @@ func (s *Supervisor) ChildState(name string) (uint64, error) {
 // actor.ErrActorNotRunning covers both terminated children and children that
 // another caller is still stopping (state Stopping), so it is treated as success
 // only after ref.Done() closes — otherwise a restart could run a replacement
-// alongside the old instance.
+// alongside the old instance. A never-started child (Initialized) has no
+// goroutine to wait for, so its error is returned immediately.
 func stopChild(ref ChildRef, timeout time.Duration) error {
 	err := ref.Stop(timeout)
 	if err == nil {
 		return nil
 	}
-	if !errors.Is(err, actor.ErrActorNotRunning) {
+	if !errors.Is(err, actor.ErrActorNotRunning) || ref.State() == actor.Initialized {
 		return err
 	}
 
