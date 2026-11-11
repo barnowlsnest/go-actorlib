@@ -129,7 +129,7 @@ func TestDrain_WhenCancelStopsSameActor_ShouldNotDeadlock(t *testing.T) {
 
 	// Assert
 	require.NoError(t, <-stopped)
-	require.Error(t, reentrantErr.Load().(error), "Stop on an exiting actor must be rejected, not block")
+	require.ErrorIs(t, reentrantErr.Load().(error), ErrActorNotRunning)
 }
 
 func TestDrain_WhenCancelPanics_ShouldStillCancelRemainingCommandsAndReportError(t *testing.T) {
