@@ -46,6 +46,7 @@ package command
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
@@ -155,7 +156,7 @@ func (gc *GoCommand[E, R]) Done() <-chan R {
 //   - nil if the command hasn't been executed or completed successfully
 //   - The delegate function's error if execution failed
 //   - A context error if the command was canceled
-//   - ErrCommandPanic if the command panicked during execution
+//   - ErrCommandPanic (joined with the panic value) if the command panicked
 func (gc *GoCommand[E, R]) Error() error {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -182,48 +183,38 @@ func (gc *GoCommand[E, R]) State() int {
 //  1. Sets state to Started (no-op if the command already ran or was canceled)
 //  2. Checks for context cancellation
 //  3. Calls the delegate function with panic recovery
-//  4. Handles the result or error appropriately
-//  5. Updates state and closes the result channel
+//  4. Records the terminal state and error
+//  5. Sends the result (on success) and closes the result channel
 //
-// The method handles all error conditions gracefully and ensures the
-// result channel is always closed, regardless of outcome.
+// A command runs at most once: calling Execute again, or after Cancel, does
+// nothing. The result channel is always closed exactly once.
 func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 	if !gc.begin() {
 		return
 	}
 
-	select {
-	case <-ctx.Done():
-		gc.syncState(Canceled, errors.Join(ErrCommandContextCancelled, ctx.Err()))
-		close(gc.done)
-		return
-	default:
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					gc.syncState(Panic, ErrCommandPanic)
-					close(gc.done)
-				}
-			}()
-
-			val, err := gc.delegateFn(entity)
-
-			if err != nil {
-				gc.syncState(Failed, err)
-				close(gc.done)
-				return
-			}
-
-			gc.done <- val
-			gc.syncState(Finished, nil)
-			close(gc.done)
-		}()
+	if err := ctx.Err(); err != nil {
+		gc.finish(Canceled, errors.Join(ErrCommandContextCancelled, err), nil)
 		return
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			gc.finish(Panic, panicError(r), nil)
+		}
+	}()
+
+	val, err := gc.delegateFn(entity)
+	if err != nil {
+		gc.finish(Failed, err, nil)
+		return
+	}
+
+	gc.finish(Finished, nil, &val)
 }
 
 // begin moves the command from Created to Started. It returns false if the
-// command already ran or was canceled, so Execute cannot re-close Done.
+// command already ran or was canceled, making repeated Execute calls no-ops.
 func (gc *GoCommand[E, R]) begin() bool {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
@@ -234,6 +225,25 @@ func (gc *GoCommand[E, R]) begin() bool {
 
 	gc.state = Started
 	return true
+}
+
+// finish records the terminal state before publishing the result, so a reader
+// that receives from Done observes the final State and Error.
+func (gc *GoCommand[E, R]) finish(state int, err error, val *R) {
+	gc.syncState(state, err)
+
+	if val != nil {
+		gc.done <- *val
+	}
+	close(gc.done)
+}
+
+// panicError wraps a recovered panic value with ErrCommandPanic.
+func panicError(r any) error {
+	if err, ok := r.(error); ok {
+		return errors.Join(ErrCommandPanic, err)
+	}
+	return errors.Join(ErrCommandPanic, fmt.Errorf("%v", r))
 }
 
 // Cancel marks a command that has not started executing as Canceled with err
