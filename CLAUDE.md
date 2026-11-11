@@ -23,7 +23,7 @@ task go-tidy         # go mod tidy
 CI (`.github/workflows/`):
 
 - `build.yml` — `task go-build` then `task go-test`; Go version from `go.mod`
-- `golangci-lint.yml` — `golangci/golangci-lint-action@v9` with golangci-lint **v2.13**
+- `golangci-lint.yml` — `golangci/golangci-lint-action@v9` with golangci-lint **v2.15**
 
 Fuzz tests:
 
@@ -145,4 +145,4 @@ Ten packages under `pkg/`.
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`.
 - Test naming convention: `TestX_Condition_ShouldY` (behavior-driven).
-- Linting: golangci-lint **v2.13** (CI), 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
+- Linting: golangci-lint **v2.15** (CI), 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).

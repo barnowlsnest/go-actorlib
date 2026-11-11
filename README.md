@@ -345,7 +345,7 @@ go install github.com/go-task/task/v3/cmd/task@latest
 task sanity   # tidy, fmt, lint --fix, build, vet, test
 ```
 
-CI on `main` runs build/test and golangci-lint **v2.13**. Full task list, fuzz commands, and dependency notes: [`CLAUDE.md`](./CLAUDE.md) and [`Taskfile.yml`](./Taskfile.yml).
+CI on `main` runs build/test and golangci-lint **v2.15**. Full task list, fuzz commands, and dependency notes: [`CLAUDE.md`](./CLAUDE.md) and [`Taskfile.yml`](./Taskfile.yml).
 
 ## Contributing
 
