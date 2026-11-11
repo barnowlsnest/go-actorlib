@@ -608,6 +608,76 @@ func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	s.True(state == uint64(Started) || state == uint64(Panicked))
 }
 
+func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
+	// Arrange
+	actor, err := StartNew(s.ctx, 100*time.Millisecond, WithProvider[*TestEntity](s.provider))
+	s.Require().NoError(err)
+
+	panicCommand := NewTestCommand("panic-cmd", func(_ context.Context, _ *TestEntity) {
+		panic("test panic")
+	})
+
+	// Act
+	s.Require().NoError(actor.Receive(s.ctx, panicCommand))
+
+	// Assert
+	select {
+	case <-actor.Done():
+	case <-time.After(time.Second):
+		s.FailNow("Done was not closed after handler panic")
+	}
+	s.Equal(uint64(Panicked), actor.State())
+}
+
+func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldNotProcessQueuedCommands() {
+	// Arrange
+	actor, err := StartNew(s.ctx, 100*time.Millisecond,
+		WithProvider[*TestEntity](s.provider),
+		WithInputBufferSize[*TestEntity](4),
+	)
+	s.Require().NoError(err)
+
+	release := make(chan struct{})
+	panicCommand := NewTestCommand("panic-cmd", func(_ context.Context, _ *TestEntity) {
+		<-release
+		panic("test panic")
+	})
+	queued := NewTestCommand("queued-cmd", func(_ context.Context, _ *TestEntity) {})
+
+	s.Require().NoError(actor.Receive(s.ctx, panicCommand))
+	s.Require().NoError(actor.Receive(s.ctx, queued))
+
+	// Act
+	close(release)
+	select {
+	case <-actor.Done():
+	case <-time.After(time.Second):
+		s.FailNow("Done was not closed after handler panic")
+	}
+
+	// Assert
+	s.False(queued.IsExecuted())
+}
+
+func (s *GoActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
+	// Arrange
+	panicHooks := &PanicHooks{TestHooks: NewTestHooks()}
+
+	actor, err := StartNew(s.ctx, 100*time.Millisecond,
+		WithProvider[*TestEntity](s.provider),
+		WithHooks[*TestEntity](panicHooks),
+	)
+	s.Require().NoError(err)
+
+	// Assert
+	select {
+	case <-actor.Done():
+	case <-time.After(time.Second):
+		s.FailNow("Done was not closed after AfterStart hook panic")
+	}
+	s.Equal(uint64(Panicked), actor.State())
+}
+
 // Test context handling
 func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
 	// Arrange
