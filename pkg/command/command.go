@@ -12,7 +12,7 @@
 //   - Context cancellation support
 //
 // The main components are:
-//   - GoCommand[E, R]: Generic command that executes operations and returns results
+//   - Command[E, R]: Generic command that executes operations and returns results
 //   - DelegateFn[E, R]: Function type for operations that commands execute
 //   - State constants: Track command execution progress
 //
@@ -89,9 +89,9 @@ type (
 	// command implementations.
 	DelegateFn[T actor.Entity, R any] func(entity T) (R, error)
 
-	// GoCommand is a generic command implementation that executes operations on entities.
+	// Command is a generic command implementation that executes operations on entities.
 	//
-	// GoCommand encapsulates an operation (DelegateFn) that can be executed asynchronously
+	// Command encapsulates an operation (DelegateFn) that can be executed asynchronously
 	// by actors. It provides type-safe execution with return values, comprehensive error
 	// handling, and thread-safe state management.
 	//
@@ -102,7 +102,7 @@ type (
 	//
 	// Results are delivered through a buffered channel accessible via Done(),
 	// while errors can be retrieved using Error().
-	GoCommand[E actor.Entity, R any] struct {
+	Command[E actor.Entity, R any] struct {
 		mu         sync.Mutex
 		state      int
 		done       chan R
@@ -111,15 +111,15 @@ type (
 	}
 )
 
-// New creates a new GoCommand that will execute the provided delegate function.
+// New creates a new Command that will execute the provided delegate function.
 //
 // The delegate function will be called with the entity when the command is executed
 // by an actor. The function should perform the desired operation and return either
 // a result of type R or an error.
 //
 // The command is created in the Created state and remains so until executed.
-func New[E actor.Entity, R any](fn DelegateFn[E, R]) *GoCommand[E, R] {
-	return &GoCommand[E, R]{
+func New[E actor.Entity, R any](fn DelegateFn[E, R]) *Command[E, R] {
+	return &Command[E, R]{
 		state:      Created,
 		done:       make(chan R, 1),
 		delegateFn: fn,
@@ -131,7 +131,7 @@ func New[E actor.Entity, R any](fn DelegateFn[E, R]) *GoCommand[E, R] {
 // This is an internal method used to ensure thread-safe updates to the
 // command's state and error fields. It should only be called from within
 // the command's execution methods.
-func (gc *GoCommand[E, R]) syncState(state int, err error) {
+func (gc *Command[E, R]) syncState(state int, err error) {
 	gc.mu.Lock()
 	gc.err = err
 	gc.state = state
@@ -146,7 +146,7 @@ func (gc *GoCommand[E, R]) syncState(state int, err error) {
 //
 // The channel is buffered with size 1, so the result won't be lost if not
 // immediately consumed.
-func (gc *GoCommand[E, R]) Done() <-chan R {
+func (gc *Command[E, R]) Done() <-chan R {
 	return gc.done
 }
 
@@ -157,7 +157,7 @@ func (gc *GoCommand[E, R]) Done() <-chan R {
 //   - The delegate function's error if execution failed
 //   - A context error if the command was canceled
 //   - ErrCommandPanic (joined with the panic value) if the command panicked
-func (gc *GoCommand[E, R]) Error() error {
+func (gc *Command[E, R]) Error() error {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 	return gc.err
@@ -169,7 +169,7 @@ func (gc *GoCommand[E, R]) Error() error {
 // Created, Started, Finished, Failed, Canceled, or Panic.
 //
 // The state progresses monotonically and never moves backwards.
-func (gc *GoCommand[E, R]) State() int {
+func (gc *Command[E, R]) State() int {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 	return gc.state
@@ -188,7 +188,7 @@ func (gc *GoCommand[E, R]) State() int {
 //
 // A command runs at most once: calling Execute again, or after Cancel, does
 // nothing. The result channel is always closed exactly once.
-func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
+func (gc *Command[E, R]) Execute(ctx context.Context, entity E) {
 	if !gc.begin() {
 		return
 	}
@@ -215,7 +215,7 @@ func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 
 // begin moves the command from Created to Started. It returns false if the
 // command already ran or was canceled, making repeated Execute calls no-ops.
-func (gc *GoCommand[E, R]) begin() bool {
+func (gc *Command[E, R]) begin() bool {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 
@@ -229,7 +229,7 @@ func (gc *GoCommand[E, R]) begin() bool {
 
 // finish records the terminal state before publishing the result, so a reader
 // that receives from Done observes the final State and Error.
-func (gc *GoCommand[E, R]) finish(state int, err error, val *R) {
+func (gc *Command[E, R]) finish(state int, err error, val *R) {
 	gc.syncState(state, err)
 
 	if val != nil {
@@ -252,7 +252,7 @@ func panicError(r any) error {
 // It implements [actor.Cancelable]: actors call it for commands still queued
 // when they terminate, passing [actor.ErrActorCommandDropped]. Cancel is a
 // no-op once the command has started executing or was already canceled.
-func (gc *GoCommand[E, R]) Cancel(err error) {
+func (gc *Command[E, R]) Cancel(err error) {
 	gc.mu.Lock()
 	defer gc.mu.Unlock()
 

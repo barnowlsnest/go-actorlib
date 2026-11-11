@@ -27,7 +27,7 @@ import (
 
 // New sends a command to the actor and waits for the result with a timeout.
 //
-// It creates a [command.GoCommand] from the provided delegate function, sends it
+// It creates a [command.Command] from the provided delegate function, sends it
 // to the actor via [actorref.Ref.Send], and waits for the result. The call
 // returns when one of the following happens:
 //   - The command completes (successfully or with an error)
@@ -37,7 +37,7 @@ import (
 // Returns the command result and nil on success, or the zero value of R and an error
 // on failure. Possible errors include:
 //   - Actor errors from [actorref.Ref.Send] (e.g., actor stopped, receive timeout)
-//   - Delegate function errors propagated via [command.GoCommand.Error]
+//   - Delegate function errors propagated via [command.Command.Error]
 //   - [context.Canceled] or [context.DeadlineExceeded] if ctx is done
 //   - [ErrAskTimeout] if the timeout expires before a result is available
 func New[E actor.Entity, R any](
@@ -59,7 +59,7 @@ func New[E actor.Entity, R any](
 // Await waits for a command result until it completes, ctx is done, or timeout elapses.
 func Await[E actor.Entity, R any](
 	ctx context.Context,
-	cmd *command.GoCommand[E, R],
+	cmd *command.Command[E, R],
 	timeout time.Duration,
 ) (R, error) {
 	var zero R

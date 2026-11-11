@@ -22,7 +22,7 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 - **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `Actor`)
 - **Signals** — SIGTERM / SIGINT graceful shutdown
 - **Panic recovery** — panics become errors; a panicked actor terminates cleanly (`Done()` closes) so supervisors can restart it
-- **Dropped commands are canceled** — `GoCommand`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
+- **Dropped commands are canceled** — `Command`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
 - **Race-tested** — the suite runs with the `-race` detector
 
 ## Why an actor library in Go?
@@ -144,7 +144,7 @@ fmt.Printf("Counter value: %d\n", result)
 return cmd.Error()
 ```
 
-A `GoCommand` runs at most once — sending the same command twice executes it once. When it does not succeed, `Done()` closes without a value and `Error()` explains why:
+A `Command` runs at most once — sending the same command twice executes it once. When it does not succeed, `Done()` closes without a value and `Error()` explains why:
 
 | Outcome | `State()` | `Error()` |
 |---|---|---|
@@ -180,7 +180,7 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 
 - **Start once.** `Start` succeeds at most once; concurrent or repeated calls return `ErrActorAlreadyStarted`. A `Start` that fails validation (`ErrActorNilEntity`) may be retried.
 - **Panics are terminal.** A panic recovered from a handler or the `AfterStart` hook moves the actor to `Panicked` and ends its goroutine; `Done()` closes. Use the `Recovery` middleware to keep the actor alive instead.
-- **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `GoCommand` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
+- **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `Command` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
 - **Stop errors.** `Stop` returns `ErrActorGracefulStopTimeout` if the actor does not finish within the timeout (state `StoppedWithError`), and an error wrapping `ErrActorNotRunning` if the actor is not `Started` (never started, already stopping, or terminated). `system.StopAll` and `supervision.Supervisor.StopAll` treat `ErrActorNotRunning` as already stopped once the actor has actually exited (`Done()` closed), waiting up to their timeout for it.
 
 ### Actor system
@@ -343,7 +343,7 @@ msg, ok := mb.Pop() // systemCmd
 |---|---|
 | [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
 | [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actorref) | Typed `Ref`: `Send`, `Stop`, `State`, `Done` |
-| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/command) | `GoCommand` with `DelegateFn` and a result channel |
+| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/command) | `Command` with `DelegateFn` and a result channel |
 | [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/ask) | Request/response with timeout |
 | [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/system) | Name registry, `Spawn`, `Register`/`Send`/`Ask`, event bus |
 | [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |

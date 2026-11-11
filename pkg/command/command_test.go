@@ -63,7 +63,7 @@ func (te *TestEntity) ClearCallLog() {
 	te.callLog = te.callLog[:0]
 }
 
-// GoCommandTestSuite provides a test suite for GoCommand
+// GoCommandTestSuite provides a test suite for Command
 type GoCommandTestSuite struct {
 	suite.Suite
 	ctx    context.Context

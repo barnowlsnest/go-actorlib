@@ -52,7 +52,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown. Returns `ErrActorGracefulStopTimeout` on timeout (state StoppedWithError), or an error wrapping `ErrActorNotRunning` (with the state name) if not Started.
 - **Panics are terminal** — a panic recovered from a handler or `AfterStart` sets Panicked and the loop exits, so `Done()` closes (supervisors depend on this).
 - **Drain on exit** — on any loop exit (stop, ctx, panic) a deferred `drain()` closes `exiting` (wakes blocked senders), takes `sendMu` write lock and sets `closed`, then empties `input`, calling `Cancel(ErrActorCommandDropped)` on every `Cancelable`; non-`Cancelable` executables are discarded silently. `Receive` holds `sendMu` read lock for the send, so every accepted command is either executed or drained — none is left in the mailbox after exit.
-- **`Cancelable`** — optional `Cancel(err error)` on executables; `GoCommand` implements it. `Cancel` runs on the actor goroutine **before** `Done()` closes (so a closed `Done` means every accepted command was executed or canceled); it must not block, especially not on the actor's own `Done()`. Re-entrant `Receive`/`Stop` from `Cancel` return errors (state is no longer Started, checked before `sendMu`). Panics are recovered per command and reported via `OnError`. Contract tests: `pkg/actor/cancel_contract_test.go`.
+- **`Cancelable`** — optional `Cancel(err error)` on executables; `Command` implements it. `Cancel` runs on the actor goroutine **before** `Done()` closes (so a closed `Done` means every accepted command was executed or canceled); it must not block, especially not on the actor's own `Done()`. Re-entrant `Receive`/`Stop` from `Cancel` return errors (state is no longer Started, checked before `sendMu`). Panics are recovered per command and reported via `OnError`. Contract tests: `pkg/actor/cancel_contract_test.go`.
 - **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started or after the loop has exited (`ErrActorReceiveOnStopped`). A done `ctx` fails fast with `ctx.Err()`, even when the mailbox has room. If the mailbox has room the send is non-blocking and arms no timer; only a full mailbox falls back to the timed `select`. Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
 - Defaults: `inputBufSize = 16`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
@@ -66,7 +66,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/command` — Command pattern for async operations
 
-- **`GoCommand[E Entity, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
+- **`Command[E Entity, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished / Failed / Canceled / Panic.
 - **Runs at most once** — `Execute` moves Created → Started under the mutex; repeat calls, or Execute after `Cancel`, are no-ops.
 - **`Cancel(err)`** — Created → Canceled, closes `Done()`; no-op once started (implements `actor.Cancelable`).

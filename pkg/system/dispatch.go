@@ -49,7 +49,7 @@ func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd 
 // Ask dispatches a request/response command to the actor registered under the given name
 // and waits for the result with a timeout.
 //
-// It creates a [command.GoCommand] from the provided delegate function, dispatches it
+// It creates a [command.Command] from the provided delegate function, dispatches it
 // via the system, and waits for the result. The call returns when one of the following happens:
 //   - The command completes (successfully or with an error)
 //   - The context is canceled
