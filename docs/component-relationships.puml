@@ -107,6 +107,7 @@ package "Actor Ref (pkg/actorref)" {
     --
     +{static} New(actor) (*Ref<T>, error)
     +Send(context.Context, Executable<T>) error
+    +Ask[R](ctx, DelegateFn<T,R>, timeout) (R, error)
     +Stop(time.Duration) error
     +State() uint64
     +Done() <-chan struct{}
@@ -133,8 +134,8 @@ package "Command System (pkg/command)" {
 }
 
 package "Ask (pkg/ask)" {
-  class "ask.New<E,R>" as AskNew <<function>> {
-    +New(ctx, ref, fn, timeout) (R, error)
+  class "ask.Await<E,R>" as AskAwait <<function>> {
+    +Await(ctx, *Command<E,R>, timeout) (R, error)
   }
 }
 
@@ -155,10 +156,10 @@ package "Actor System (pkg/system)" {
     +StopAll(timeout) error
     +Count() int
     +OnEvent(EventHandler)
-  }
-
-  class "Spawn<T>" as Spawn <<function>> {
-    +Spawn(sys, ctx, name, provider, timeout, opts...) (*Ref<T>, error)
+    +Spawn[T](ctx, name, provider, timeout, opts...) (*Ref<T>, error)
+    +Register[T](name, *Ref<T>) error
+    +Send[T](ctx, name, Executable<T>) error
+    +Ask[T,R](ctx, name, DelegateFn<T,R>, timeout) (R, error)
   }
 
   class Event {
@@ -279,15 +280,14 @@ HandlerFunc ..> Executable : handles
 GoActorContext --> BehaviorStack : delegates to
 
 ' Ask uses Ref
-AskNew ..> Ref : sends command via
-AskNew ..> GoCommand : creates and awaits
-AskNew ..> DelegateFn : wraps into command
+Ref ..> DelegateFn : Ask wraps into command
+Ref ..> AskAwait : Ask waits via
+AskAwait ..> GoCommand : awaits
 
 ' System
 ActorSystem o-- ManagedActor : manages
-Spawn ..> GoActor : creates
-Spawn ..> Ref : wraps in
-Spawn ..> ActorSystem : registers with
+ActorSystem ..> GoActor : Spawn creates
+ActorSystem ..> Ref : Spawn wraps in
 ActorSystem --> Event : emits
 
 ' Supervision

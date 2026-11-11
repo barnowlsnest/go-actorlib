@@ -31,7 +31,7 @@ package "pkg/command" as command_pkg {
 }
 
 package "pkg/ask" as ask_pkg {
-  component [ask.New<E,R>] as ask
+  component [ask.Await<E,R>] as ask
 }
 
 package "pkg/system" as system_pkg {
@@ -66,7 +66,7 @@ package "pkg/mailbox" as mailbox_pkg {
 
 ' Client relationships
 user --> ref : sends commands via
-user --> ask : request/response
+user --> ref : request/response (Ref.Ask)
 user --> system : registers actors
 user --> supervisor : manages lifecycles
 user --> signal : graceful shutdown
@@ -87,8 +87,8 @@ command --> delegate : executes function
 delegate --> entity : operates on
 
 ' Ask uses Ref
-ask --> ref : sends command via
-ask --> command : creates and awaits
+ref --> ask : Ask waits via
+ask --> command : awaits
 
 ' System relationships
 system --> ref : manages refs

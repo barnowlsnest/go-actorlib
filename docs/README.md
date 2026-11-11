@@ -9,7 +9,7 @@ High-level view of all ten packages and their relationships:
 - `pkg/actor` — Core actor with middleware, behavior stack, actor context
 - `pkg/actorref` — Typed actor handle (Ref)
 - `pkg/command` — Command pattern implementation
-- `pkg/ask` — Request/response convenience
+- `pkg/ask` — Shared request/response wait (`Await`) behind `Ref.Ask` and `ActorSystem.Ask`
 - `pkg/system` — Actor system with registry, Spawn, event bus
 - `pkg/supervision` — Supervisor with restart strategies and death watch
 - `pkg/middleware` — Reference middleware (logging, metrics, recovery)
@@ -52,7 +52,7 @@ Detailed sequence diagram of the Actor Model message passing pattern:
 - BehaviorStack for dynamic handler selection
 - Stop channel signaling for concurrent-safe shutdown
 - Backpressure via bounded input channel
-- Ask pattern as simplified request/response via Ref
+- Ask pattern as simplified request/response via `ref.Ask`
 
 ### 6. [Supervision](./supervision.puml)
 Sequence diagram of supervisor lifecycle management:
@@ -77,7 +77,7 @@ Sequence diagram of actor system operations:
 - Direct registration as alternative to Spawn
 - Spawn failure with automatic cleanup
 - LIFO shutdown ordering with signal integration
-- system.Send and system.Ask for name-based messaging
+- `sys.Send` and `sys.Ask` for name-based messaging
 
 ## Viewing the Diagrams
 

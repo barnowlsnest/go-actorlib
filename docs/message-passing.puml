@@ -119,11 +119,11 @@ end note
 participant "Caller" as caller
 
 activate caller
-caller -> caller : ask.New(ctx, ref, fn, timeout)
-caller -> ref : ref.Send(ctx, cmd)
-ref -> channel : actor.Receive(ctx, cmd)
+caller -> ref : ref.Ask(ctx, fn, timeout)
+ref -> ref : cmd := command.New(fn)
+ref -> channel : Send → actor.Receive(ctx, cmd)
 channel --> ref : success
-ref --> caller : nil
+ref -> ref : ask.Await(ctx, cmd, timeout)
 
 alt Result Ready
   result --> caller : (R, nil)
@@ -136,6 +136,6 @@ else Timeout
 end
 deactivate caller
 
-note over caller : "ask.New wraps command\ncreation, ref.Send, wait,\nand error check into one call"
+note over caller : "ref.Ask wraps command\ncreation, ref.Send, ask.Await,\nand error check into one call"
 
 @enduml

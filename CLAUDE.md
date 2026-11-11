@@ -40,7 +40,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 - **`Actor[T any]`** — Generic actor that manages an entity of type `*T` in an isolated goroutine. `T` is the entity's base type: `Actor[Counter]`, `WithName[Counter]`, never `[*Counter]`. Processes `Executable[T]` commands sequentially from a bounded input channel.
 - **`Entity`** — `IsProvidable() bool`, implemented by `*T`.
-- **`EntityPtr[T]`** — `interface{ *T; Entity }`. `New`, `StartNew`, and `system.Spawn` take a trailing `PT EntityPtr[T]`, inferred from `T`, to require at compile time that `*T` implements `Entity`; `New` binds `PT(e).IsProvidable()` into a closure so `Actor[T]` keeps one type parameter. Every other generic in the module is `[T any]`.
+- **`EntityPtr[T]`** — `interface{ *T; Entity }`. `New`, `StartNew`, and `ActorSystem.Spawn` take a trailing `PT EntityPtr[T]`, inferred from `T`, to require at compile time that `*T` implements `Entity`; `New` binds `PT(e).IsProvidable()` into a closure so `Actor[T]` keeps one type parameter. Every other generic in the module is `[T any]`.
 - **`Executable[T any]`** — `Execute(ctx, *T)`; commands sent via `Receive()`.
 - **`EntityProvider[T]`** — `Provide() *T`; required at construction (`ErrActorNilProvider`).
 - **`Hooks`** — BeforeStart, AfterStart, BeforeStop, AfterStop, OnError. Default is `noopHooks`.
@@ -61,8 +61,9 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actorref` — Typed actor handle (proxy)
 
-- **`Ref[T any]`** — Immutable proxy (`actor` field unexported). `Send`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
+- **`Ref[T any]`** — Immutable proxy (`actor` field unexported). `Send`, `Ask`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
 - **`New[T](a *Actor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
+- **`Ask[R any](ctx, DelegateFn[T, R], timeout)`** — generic method: `command.New` + `Send` + `ask.Await`.
 - Safe for concurrent use; multiple refs can point to the same actor. `Send` delegates to `Receive`.
 
 ### `pkg/command` — Command pattern for async operations
@@ -74,17 +75,17 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - Terminal state/error are recorded **before** the result is sent, so a receiver sees the final `State()`.
 - On success: one value on `Done()`, then close. On failure/cancel/panic: close without a value; inspect `Error()`. Panic error is `errors.Join(ErrCommandPanic, <panic value>)` — compare with `errors.Is`.
 
-### `pkg/ask` — Ask pattern (request/response convenience)
+### `pkg/ask` — Shared request/response wait
 
-- **`New[E, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*Actor[E]`.
+- **`Await[E, R any](ctx, *command.Command[E, R], timeout)`** — waits for a command result; used by `Ref.Ask` and `ActorSystem.Ask`. Imports only `command` (`actorref` imports `ask`, not the reverse).
 - **`ErrAskTimeout`** — Result not received within timeout. Also returns `ctx.Err()` if the context is done first.
 
 ### `pkg/system` — Actor system with registry and lifecycle
 
 - **`ActorSystem`** — Flat name registry. Thread-safe. After `StopAll`, further ops return `ErrSystemStopped`.
 - **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
-- **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
-- **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
+- **`Register[T](name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **methods** on `*ActorSystem` (Go 1.27 generic methods; they cannot appear in interfaces, so `ManagedActor` / `Stoppable` stay non-generic). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
+- **`Spawn[T, PT]`** — method; `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
 - **`stopManaged`** — `StopAll`'s per-actor stop. `actor.ErrActorNotRunning` is not proof of exit (also returned for Stopping, and for StoppedWithError after a timed-out Stop whose goroutine is still running). If the actor exposes `Done()` (`actorref.Ref` does) it waits via `stopwait.Wait`; otherwise only Done / Canceled / Panicked count as stopped. A never-started (Initialized) actor returns its `ErrActorNotRunning` immediately — its `Done()` would never close.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
@@ -147,8 +148,8 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 1. Define entity implementing `Entity`, create a provider implementing `EntityProvider[T]`.
 2. Create and start: `actor.StartNew(ctx, timeout, WithProvider(provider), opts...)` or `New` → `Start` → `WaitReady`.
 3. Obtain a ref: `ref, err := actorref.New(myActor)`.
-4. Or spawn: `ref, err := system.Spawn(sys, ctx, "name", provider, timeout, opts...)`.
-5. Send: `ref.Send(ctx, command.New(delegateFn))` or `system.Send` / `ask.New` / `system.Ask`.
+4. Or spawn: `ref, err := sys.Spawn(ctx, "name", provider, timeout, opts...)`.
+5. Send: `ref.Send(ctx, command.New(delegateFn))` or `sys.Send` / `ref.Ask` / `sys.Ask`.
 6. Get results: `<-cmd.Done()`, then `cmd.Error()`.
 7. Dynamic behavior: `actor.GetGoActorContext[T](ctx).Become(newHandler)`.
 8. Shutdown: `ref.Stop(timeout)` or `sys.StopAll(timeout)` or `signal.AwaitShutdown(ctx, sys, timeout)`.
@@ -156,6 +157,8 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 ## Code Conventions
 
 - Heavy use of Go generics for type safety — avoid raw `interface{}`.
+- Entity type parameters name the base type (`[Counter]`, never `[*Counter]`); the actor manages `*T`.
+- Prefer generic methods (Go 1.27) over free functions when there is a natural receiver (`ref.Ask`, `sys.Spawn`). Interfaces cannot declare generic methods, so keep interface method sets non-generic. Editors need a gopls built for Go 1.27, or they report `method must have no type parameters`.
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`. A recovered actor panic terminates the actor.
 - Prefer sentinel errors (wrap with `%w`) over ad-hoc `fmt.Errorf` so callers can use `errors.Is`.

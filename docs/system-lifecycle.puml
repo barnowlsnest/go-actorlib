@@ -17,7 +17,7 @@ user -> sys : system.New()
 user -> sys : OnEvent(eventHandler)
 
 == Spawn Actor (Convenience) ==
-user -> sys : system.Spawn(sys, ctx, "worker-1", provider, timeout, opts...)
+user -> sys : sys.Spawn(ctx, "worker-1", provider, timeout, opts...)
 activate sys
 
 sys -> factory : actor.New(WithProvider, WithName("worker-1"), opts...)
@@ -41,7 +41,7 @@ sys --> user : (ref, nil)
 deactivate sys
 
 == Spawn Second Actor ==
-user -> sys : system.Spawn(sys, ctx, "worker-2", provider, timeout)
+user -> sys : sys.Spawn(ctx, "worker-2", provider, timeout)
 activate sys
 note right : Same flow: New → Start → WaitReady → Ref → Register
 sys -> handler : **EventActorStarted**\n{ActorName: "worker-2"}
@@ -55,14 +55,14 @@ note over user
   a.Start(ctx)
   a.WaitReady(ctx, timeout)
   ref := actorref.New(a)
-  system.Register(sys, "worker-3", ref)
+  sys.Register("worker-3", ref)
 end note
 
 == Using the System ==
-user -> sys : system.Send(sys, ctx, "worker-1", cmd)
+user -> sys : sys.Send(ctx, "worker-1", cmd)
 sys -> ref : ref.Send(ctx, cmd)
 
-user -> sys : system.Ask(sys, ctx, "worker-1", fn, timeout)
+user -> sys : sys.Ask(ctx, "worker-1", fn, timeout)
 note right : Combines command creation,\nsend via ref, and result waiting
 
 user -> sys : sys.Get("worker-1")
@@ -72,7 +72,7 @@ user -> sys : sys.Count()
 sys --> user : 3
 
 == Spawn Failure (Automatic Cleanup) ==
-user -> sys : system.Spawn(sys, ctx, "duplicate", provider, timeout)
+user -> sys : sys.Spawn(ctx, "duplicate", provider, timeout)
 activate sys
 sys -> sys : Register("duplicate", ref)
 sys --> sys : ErrActorAlreadyRegistered
