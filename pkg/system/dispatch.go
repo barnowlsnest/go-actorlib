@@ -12,14 +12,14 @@ import (
 
 // Register adds a typed actor reference to the system under the given name.
 // It captures a dispatch closure at registration time that enables type-safe
-// command routing via [Send] and [Ask].
+// command routing via [ActorSystem.Send] and [ActorSystem.Ask].
 //
 // Returns an error if:
 //   - The system is stopped ([ErrSystemStopped])
 //   - The name is empty ([ErrActorNameEmpty])
 //   - The ref is nil ([ErrActorNilRef])
 //   - The name is already registered ([ErrActorNameDuplicate])
-func Register[T any](s *ActorSystem, name string, ref *actorref.Ref[T]) error {
+func (s *ActorSystem) Register[T any](name string, ref *actorref.Ref[T]) error {
 	if ref == nil {
 		return ErrActorNilRef
 	}
@@ -42,7 +42,7 @@ func Register[T any](s *ActorSystem, name string, ref *actorref.Ref[T]) error {
 //   - The actor name is not found ([ErrActorNotFound])
 //   - The command type does not match the actor's entity type ([ErrCommandTypeMismatch])
 //   - The underlying actor send fails (e.g., buffer full, actor stopped)
-func Send[T any](s *ActorSystem, ctx context.Context, name string, cmd actor.Executable[T]) error {
+func (s *ActorSystem) Send[T any](ctx context.Context, name string, cmd actor.Executable[T]) error {
 	return s.send(ctx, name, cmd)
 }
 
@@ -57,8 +57,7 @@ func Send[T any](s *ActorSystem, ctx context.Context, name string, cmd actor.Exe
 //
 // Returns the command result and nil on success, or the zero value of R and an error on failure.
 // Timeout errors are [ask.ErrAskTimeout] (also available as [ErrAskTimeout]).
-func Ask[T, R any](
-	s *ActorSystem,
+func (s *ActorSystem) Ask[T, R any](
 	ctx context.Context,
 	name string,
 	fn command.DelegateFn[T, R],

@@ -9,14 +9,13 @@ import (
 )
 
 // Spawn creates, starts, and registers an actor in the system in one operation.
-// It combines [actor.StartNew], [actorref.New], and [Register].
+// It combines [actor.StartNew], [actorref.New], and [ActorSystem.Register].
 //
 // The actor is configured with WithName automatically using the provided name.
 //
 // Returns the actor reference or an error if any step fails.
 // On registration failure, the actor is stopped so the system state is unchanged.
-func Spawn[T any, PT actor.EntityPtr[T]](
-	s *ActorSystem,
+func (s *ActorSystem) Spawn[T any, PT actor.EntityPtr[T]](
 	ctx context.Context,
 	name string,
 	provider actor.EntityProvider[T],
@@ -38,7 +37,7 @@ func Spawn[T any, PT actor.EntityPtr[T]](
 		return nil, err
 	}
 
-	if regErr := Register(s, name, ref); regErr != nil {
+	if regErr := s.Register(name, ref); regErr != nil {
 		_ = ref.Stop(readyTimeout)
 		return nil, regErr
 	}

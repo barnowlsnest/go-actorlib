@@ -1,12 +1,12 @@
-// Package ask provides a convenience function for request/response interactions with actors.
+// Package ask waits for the result of a request/response command.
 //
-// The Ask pattern collapses the typical verbose process of creating a command,
-// sending it to an actor, waiting for a result with a timeout, and checking for errors
-// into a single function call.
+// [Await] is the shared wait used by [actorref.Ref.Ask] and
+// [system.ActorSystem.Ask]: it returns when the command completes, ctx is
+// done, or the timeout elapses ([ErrAskTimeout]).
 //
-// Example usage:
+// Most callers use those methods directly:
 //
-//	result, err := ask.New(ctx, myActorRef, func(entity *MyEntity) (int, error) {
+//	result, err := ref.Ask(ctx, func(entity *MyEntity) (int, error) {
 //	    entity.value++
 //	    return entity.value, nil
 //	}, 5*time.Second)
@@ -20,40 +20,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
 )
-
-// New sends a command to the actor and waits for the result with a timeout.
-//
-// It creates a [command.Command] from the provided delegate function, sends it
-// to the actor via [actorref.Ref.Send], and waits for the result. The call
-// returns when one of the following happens:
-//   - The command completes (successfully or with an error)
-//   - The context is canceled
-//   - The timeout expires
-//
-// Returns the command result and nil on success, or the zero value of R and an error
-// on failure. Possible errors include:
-//   - Actor errors from [actorref.Ref.Send] (e.g., actor stopped, receive timeout)
-//   - Delegate function errors propagated via [command.Command.Error]
-//   - [context.Canceled] or [context.DeadlineExceeded] if ctx is done
-//   - [ErrAskTimeout] if the timeout expires before a result is available
-func New[E, R any](
-	ctx context.Context,
-	ref *actorref.Ref[E],
-	fn command.DelegateFn[E, R],
-	timeout time.Duration,
-) (R, error) {
-	var zero R
-	cmd := command.New(fn)
-
-	if err := ref.Send(ctx, cmd); err != nil {
-		return zero, err
-	}
-
-	return Await(ctx, cmd, timeout)
-}
 
 // Await waits for a command result until it completes, ctx is done, or timeout elapses.
 func Await[E, R any](

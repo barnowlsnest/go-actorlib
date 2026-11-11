@@ -154,7 +154,7 @@ func (s *ActorSystemTestSuite) TestRegister_ValidNameAndRef_ShouldSucceed() {
 	ref, _ := s.newStartedRef()
 
 	// Act
-	err := Register(sys, "actor-1", ref)
+	err := sys.Register("actor-1", ref)
 
 	// Assert
 	s.NoError(err)
@@ -167,7 +167,7 @@ func (s *ActorSystemTestSuite) TestRegister_EmptyName_ShouldReturnError() {
 	ref, _ := s.newStartedRef()
 
 	// Act
-	err := Register(sys, "", ref)
+	err := sys.Register("", ref)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNameEmpty)
@@ -179,7 +179,7 @@ func (s *ActorSystemTestSuite) TestRegister_NilRef_ShouldReturnError() {
 	sys := New()
 
 	// Act
-	err := Register[testEntity](sys, "actor-1", nil)
+	err := sys.Register[testEntity]("actor-1", nil)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNilRef)
@@ -192,11 +192,11 @@ func (s *ActorSystemTestSuite) TestRegister_DuplicateName_ShouldReturnError() {
 	ref1, _ := s.newStartedRef()
 	ref2, _ := s.newStartedRef()
 
-	err := Register(sys, "actor-1", ref1)
+	err := sys.Register("actor-1", ref1)
 	s.Require().NoError(err)
 
 	// Act
-	err = Register(sys, "actor-1", ref2)
+	err = sys.Register("actor-1", ref2)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNameDuplicate)
@@ -213,7 +213,7 @@ func (s *ActorSystemTestSuite) TestRegister_AfterStopAll_ShouldReturnError() {
 	ref, _ := s.newStartedRef()
 
 	// Act
-	err = Register(sys, "actor-1", ref)
+	err = sys.Register("actor-1", ref)
 
 	// Assert
 	s.ErrorIs(err, ErrSystemStopped)
@@ -227,9 +227,9 @@ func (s *ActorSystemTestSuite) TestRegister_MultipleActors_ShouldTrackAll() {
 	ref3, _ := s.newStartedRef()
 
 	// Act
-	s.Require().NoError(Register(sys, "a", ref1))
-	s.Require().NoError(Register(sys, "b", ref2))
-	s.Require().NoError(Register(sys, "c", ref3))
+	s.Require().NoError(sys.Register("a", ref1))
+	s.Require().NoError(sys.Register("b", ref2))
+	s.Require().NoError(sys.Register("c", ref3))
 
 	// Assert
 	s.Equal(3, sys.Count())
@@ -242,7 +242,7 @@ func (s *ActorSystemTestSuite) TestGet_ExistingActor_ShouldReturnRef() {
 	sys := New()
 	ref, _ := s.newStartedRef()
 
-	err := Register(sys, "actor-1", ref)
+	err := sys.Register("actor-1", ref)
 	s.Require().NoError(err)
 
 	// Act
@@ -288,7 +288,7 @@ func (s *ActorSystemTestSuite) TestUnregister_ExistingActor_ShouldRemove() {
 	sys := New()
 	ref, _ := s.newStartedRef()
 
-	err := Register(sys, "actor-1", ref)
+	err := sys.Register("actor-1", ref)
 	s.Require().NoError(err)
 
 	// Act
@@ -334,7 +334,7 @@ func (s *ActorSystemTestSuite) TestSend_ValidCommand_ShouldDispatchToActor() {
 	sys := New()
 	ref, entity := s.newStartedRef()
 
-	err := Register(sys, "worker", ref)
+	err := sys.Register("worker", ref)
 	s.Require().NoError(err)
 
 	executed := make(chan struct{})
@@ -345,7 +345,7 @@ func (s *ActorSystemTestSuite) TestSend_ValidCommand_ShouldDispatchToActor() {
 	})
 
 	// Act
-	err = Send(sys, s.ctx, "worker", cmd)
+	err = sys.Send(s.ctx, "worker", cmd)
 
 	// Assert
 	s.NoError(err)
@@ -365,7 +365,7 @@ func (s *ActorSystemTestSuite) TestSend_NonExistentActor_ShouldReturnError() {
 	cmd := command.New(func(e *testEntity) (string, error) { return "", nil })
 
 	// Act
-	err := Send(sys, s.ctx, "unknown", cmd)
+	err := sys.Send(s.ctx, "unknown", cmd)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNotFound)
@@ -381,7 +381,7 @@ func (s *ActorSystemTestSuite) TestSend_AfterStopAll_ShouldReturnError() {
 	cmd := command.New(func(e *testEntity) (string, error) { return "", nil })
 
 	// Act
-	err = Send(sys, s.ctx, "worker", cmd)
+	err = sys.Send(s.ctx, "worker", cmd)
 
 	// Assert
 	s.ErrorIs(err, ErrSystemStopped)
@@ -392,7 +392,7 @@ func (s *ActorSystemTestSuite) TestSend_TypeMismatch_ShouldReturnError() {
 	sys := New()
 	ref, _ := s.newStartedRef()
 
-	err := Register(sys, "worker", ref)
+	err := sys.Register("worker", ref)
 	s.Require().NoError(err)
 
 	// Create a command for a different entity type and dispatch via the type-erased path.
@@ -413,11 +413,11 @@ func (s *ActorSystemTestSuite) TestAsk_ValidRequest_ShouldReturnResult() {
 	ref, entity := s.newStartedRef()
 	entity.SetValue("hello")
 
-	err := Register(sys, "worker", ref)
+	err := sys.Register("worker", ref)
 	s.Require().NoError(err)
 
 	// Act
-	result, err := Ask(sys, s.ctx, "worker", func(e *testEntity) (string, error) {
+	result, err := sys.Ask(s.ctx, "worker", func(e *testEntity) (string, error) {
 		return e.GetValue(), nil
 	}, time.Second)
 
@@ -431,7 +431,7 @@ func (s *ActorSystemTestSuite) TestAsk_Timeout_ShouldReturnError() {
 	sys := New()
 	ref, _ := s.newStartedRef()
 
-	err := Register(sys, "worker", ref)
+	err := sys.Register("worker", ref)
 	s.Require().NoError(err)
 
 	// Block the actor so the ask command can't execute in time.
@@ -439,11 +439,11 @@ func (s *ActorSystemTestSuite) TestAsk_Timeout_ShouldReturnError() {
 		time.Sleep(500 * time.Millisecond)
 		return "", nil
 	})
-	err = Send(sys, s.ctx, "worker", blockCmd)
+	err = sys.Send(s.ctx, "worker", blockCmd)
 	s.Require().NoError(err)
 
 	// Act
-	_, err = Ask(sys, s.ctx, "worker", func(e *testEntity) (string, error) {
+	_, err = sys.Ask(s.ctx, "worker", func(e *testEntity) (string, error) {
 		return "result", nil
 	}, 10*time.Millisecond)
 
@@ -456,7 +456,7 @@ func (s *ActorSystemTestSuite) TestAsk_NonExistentActor_ShouldReturnError() {
 	sys := New()
 
 	// Act
-	_, err := Ask(sys, s.ctx, "unknown", func(e *testEntity) (string, error) {
+	_, err := sys.Ask(s.ctx, "unknown", func(e *testEntity) (string, error) {
 		return "", nil
 	}, time.Second)
 
@@ -571,7 +571,7 @@ func (s *ActorSystemTestSuite) TestConcurrentRegister_ShouldBeSafe() {
 	for i := range goroutines {
 		wg.Go(func() {
 			ref, _ := s.newStartedRef()
-			_ = Register(sys, fmt.Sprintf("actor-%d", i), ref)
+			_ = sys.Register(fmt.Sprintf("actor-%d", i), ref)
 		})
 	}
 	wg.Wait()
@@ -585,7 +585,7 @@ func (s *ActorSystemTestSuite) TestConcurrentSend_ShouldBeSafe() {
 	sys := New()
 	ref, _ := s.newStartedRef()
 
-	err := Register(sys, "worker", ref)
+	err := sys.Register("worker", ref)
 	s.Require().NoError(err)
 
 	const goroutines = 50
@@ -598,7 +598,7 @@ func (s *ActorSystemTestSuite) TestConcurrentSend_ShouldBeSafe() {
 			cmd := command.New(func(e *testEntity) (string, error) {
 				return "", nil
 			})
-			errs[i] = Send(sys, s.ctx, "worker", cmd)
+			errs[i] = sys.Send(s.ctx, "worker", cmd)
 		})
 	}
 	wg.Wait()
@@ -620,7 +620,7 @@ func (s *ActorSystemTestSuite) TestConcurrentGetAndRegister_ShouldBeSafe() {
 		wg.Go(func() {
 			if i%2 == 0 {
 				ref, _ := s.newStartedRef()
-				_ = Register(sys, fmt.Sprintf("actor-%d", i), ref)
+				_ = sys.Register(fmt.Sprintf("actor-%d", i), ref)
 			} else {
 				_, _ = sys.Get(fmt.Sprintf("actor-%d", i-1))
 			}
@@ -643,8 +643,8 @@ func (s *ActorSystemTestSuite) TestIntegration_FullFlow_ShouldWork() {
 	entity1.SetValue("entity-1")
 	entity2.SetValue("entity-2")
 
-	s.Require().NoError(Register(sys, "worker-1", ref1))
-	s.Require().NoError(Register(sys, "worker-2", ref2))
+	s.Require().NoError(sys.Register("worker-1", ref1))
+	s.Require().NoError(sys.Register("worker-2", ref2))
 	s.Equal(2, sys.Count())
 
 	// Act — Send command to worker-1
@@ -654,7 +654,7 @@ func (s *ActorSystemTestSuite) TestIntegration_FullFlow_ShouldWork() {
 		close(executed)
 		return "", nil
 	})
-	err := Send(sys, s.ctx, "worker-1", cmd)
+	err := sys.Send(s.ctx, "worker-1", cmd)
 	s.Require().NoError(err)
 
 	select {
@@ -665,7 +665,7 @@ func (s *ActorSystemTestSuite) TestIntegration_FullFlow_ShouldWork() {
 	}
 
 	// Act — Ask worker-2
-	result, err := Ask(sys, s.ctx, "worker-2", func(e *testEntity) (string, error) {
+	result, err := sys.Ask(s.ctx, "worker-2", func(e *testEntity) (string, error) {
 		return e.GetValue(), nil
 	}, time.Second)
 	s.NoError(err)
@@ -691,7 +691,7 @@ func (s *ActorSystemTestSuite) TestSpawn_ValidArgs_ShouldCreateAndRegister() {
 	provider := &testEntityProvider{entity: entity}
 
 	// Act
-	ref, err := Spawn(sys, s.ctx, "spawned", provider, 100*time.Millisecond)
+	ref, err := sys.Spawn(s.ctx, "spawned", provider, 100*time.Millisecond)
 
 	// Assert
 	s.NoError(err)
@@ -706,11 +706,11 @@ func (s *ActorSystemTestSuite) TestSpawn_DuplicateName_ShouldReturnError() {
 	entity := newTestEntity("test")
 	provider := &testEntityProvider{entity: entity}
 
-	_, err := Spawn(sys, s.ctx, "worker", provider, 100*time.Millisecond)
+	_, err := sys.Spawn(s.ctx, "worker", provider, 100*time.Millisecond)
 	s.Require().NoError(err)
 
 	// Act
-	_, err = Spawn(sys, s.ctx, "worker", provider, 100*time.Millisecond)
+	_, err = sys.Spawn(s.ctx, "worker", provider, 100*time.Millisecond)
 
 	// Assert
 	s.ErrorIs(err, ErrActorNameDuplicate)
@@ -723,11 +723,11 @@ func (s *ActorSystemTestSuite) TestSpawn_ShouldSetActorName() {
 	provider := &testEntityProvider{entity: entity}
 
 	// Act
-	ref, err := Spawn(sys, s.ctx, "named-actor", provider, 100*time.Millisecond)
+	ref, err := sys.Spawn(s.ctx, "named-actor", provider, 100*time.Millisecond)
 	s.Require().NoError(err)
 
 	// Verify via Ask that the actor context has the correct name
-	result, err := Ask(sys, s.ctx, "named-actor", func(e *testEntity) (string, error) {
+	result, err := sys.Ask(s.ctx, "named-actor", func(e *testEntity) (string, error) {
 		return e.GetValue(), nil
 	}, time.Second)
 
@@ -744,8 +744,8 @@ func (s *ActorSystemTestSuite) TestOnEvent_StopAll_ShouldEmitEvents() {
 	ref1, _ := s.newStartedRef()
 	ref2, _ := s.newStartedRef()
 
-	s.Require().NoError(Register(sys, "a", ref1))
-	s.Require().NoError(Register(sys, "b", ref2))
+	s.Require().NoError(sys.Register("a", ref1))
+	s.Require().NoError(sys.Register("b", ref2))
 
 	var events []Event
 	var mu sync.Mutex
@@ -781,7 +781,7 @@ func (s *ActorSystemTestSuite) TestOnEvent_Spawn_ShouldEmitStartEvent() {
 	})
 
 	// Act
-	_, err := Spawn(sys, s.ctx, "spawned", provider, 100*time.Millisecond)
+	_, err := sys.Spawn(s.ctx, "spawned", provider, 100*time.Millisecond)
 	s.Require().NoError(err)
 
 	// Assert
@@ -857,13 +857,13 @@ func BenchmarkSend(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	_ = Register(sys, "target", ref)
+	_ = sys.Register("target", ref)
 
 	b.ResetTimer()
 
 	for range b.N {
 		cmd := command.New(func(e *testEntity) (string, error) { return "", nil })
-		_ = Send(sys, ctx, "target", cmd)
+		_ = sys.Send(ctx, "target", cmd)
 	}
 }
 
@@ -903,9 +903,9 @@ func (panicCmd) Execute(context.Context, *testEntity) { panic("boom") }
 func (s *ActorSystemTestSuite) TestStopAll_WithAlreadyTerminatedActor_ShouldNotReportError() {
 	// Arrange
 	sys := New()
-	ref, err := Spawn(sys, s.ctx, "crashy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	ref, err := sys.Spawn(s.ctx, "crashy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
 	s.Require().NoError(err)
-	_, err = Spawn(sys, s.ctx, "healthy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	_, err = sys.Spawn(s.ctx, "healthy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
 	s.Require().NoError(err)
 
 	s.Require().NoError(ref.Send(s.ctx, panicCmd{}))
@@ -928,7 +928,7 @@ func (b blockingCmd) Execute(context.Context, *testEntity) {
 // spawnTimedOut spawns an actor whose Stop already timed out: state is
 // StoppedWithError while its goroutine is still running blockingCmd.
 func (s *ActorSystemTestSuite) spawnTimedOut(sys *ActorSystem) (ref *actorref.Ref[testEntity], release chan struct{}) {
-	ref, err := Spawn(sys, s.ctx, "slow", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	ref, err := sys.Spawn(s.ctx, "slow", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
 	s.Require().NoError(err)
 
 	cmd := blockingCmd{started: make(chan struct{}), release: make(chan struct{})}
@@ -1011,7 +1011,7 @@ func (s *ActorSystemTestSuite) TestStopAll_WithRegisteredButNeverStartedActor_Sh
 	ref, err := actorref.New(a)
 	s.Require().NoError(err)
 	sys := New()
-	s.Require().NoError(Register(sys, "unstarted", ref))
+	s.Require().NoError(sys.Register("unstarted", ref))
 
 	// Act
 	start := time.Now()
