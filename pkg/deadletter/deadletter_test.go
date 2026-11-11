@@ -89,3 +89,29 @@ func (s *DeadLetterTestSuite) TestLetters_ShouldReturnCopy() {
 	// Original should be unchanged
 	s.Equal("a", q.Letters()[0].Target)
 }
+
+func (s *DeadLetterTestSuite) TestPublish_WithZeroCapacity_ShouldNotifyWithoutRetaining() {
+	// Arrange
+	q := New(WithCapacity(0))
+	var got []Letter
+	q.OnDeadLetter(func(l Letter) { got = append(got, l) })
+
+	// Act
+	s.NotPanics(func() {
+		q.Publish(Letter{Target: "a", Reason: "r"})
+		q.Publish(Letter{Target: "b", Reason: "r"})
+	})
+
+	// Assert
+	s.Equal(0, q.Count())
+	s.Empty(q.Letters())
+	s.Len(got, 2)
+}
+
+func (s *DeadLetterTestSuite) TestNew_WithNegativeCapacity_ShouldBehaveLikeZero() {
+	var q *Queue
+	s.NotPanics(func() { q = New(WithCapacity(-5)) })
+
+	s.NotPanics(func() { q.Publish(Letter{Target: "a"}) })
+	s.Equal(0, q.Count())
+}
