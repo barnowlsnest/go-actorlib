@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/barnowlsnest/go-actorlib/v5/internal/stopwait"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 )
 
@@ -216,8 +217,7 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	var errs []error
 
 	for _, e := range entries {
-		// An actor that already terminated (e.g. panicked) needs no stopping.
-		if err := e.managed.Stop(timeout); err != nil && !errors.Is(err, actor.ErrActorNotRunning) {
+		if err := stopManaged(e.managed, timeout); err != nil {
 			errs = append(errs, err)
 		}
 		s.emitEvent(Event{Kind: EventActorStopped, ActorName: e.name})
@@ -232,4 +232,29 @@ func (s *ActorSystem) Count() int {
 	defer s.mu.RUnlock()
 
 	return len(s.actors)
+}
+
+// stopManaged stops m and returns once it has exited.
+//
+// actor.ErrActorNotRunning does not by itself mean the actor has exited: it is
+// also returned while another caller is stopping it (Stopping) or after a Stop
+// that timed out (StoppedWithError) while its goroutine is still running. When
+// m exposes Done (as actorref.Ref does), wait for it within timeout. Otherwise
+// only states set after the goroutine has finished count as stopped.
+func stopManaged(m ManagedActor, timeout time.Duration) error {
+	err := m.Stop(timeout)
+	if err == nil || !errors.Is(err, actor.ErrActorNotRunning) {
+		return err
+	}
+
+	if d, ok := m.(interface{ Done() <-chan struct{} }); ok {
+		return stopwait.Wait(d.Done(), timeout, err)
+	}
+
+	switch m.State() {
+	case actor.Done, actor.Canceled, actor.Panicked:
+		return nil
+	default:
+		return err
+	}
 }

@@ -26,10 +26,10 @@ package supervision
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
+	"github.com/barnowlsnest/go-actorlib/v5/internal/stopwait"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 )
 
@@ -400,13 +400,5 @@ func stopChild(ref ChildRef, timeout time.Duration) error {
 		return err
 	}
 
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case <-ref.Done():
-		return nil
-	case <-timer.C:
-		return fmt.Errorf("%w: child did not exit within %v (%w)", actor.ErrActorGracefulStopTimeout, timeout, err)
-	}
+	return stopwait.Wait(ref.Done(), timeout, err)
 }
