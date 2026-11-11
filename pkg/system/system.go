@@ -22,6 +22,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 )
 
 // ManagedActor defines the minimal interface for actors managed by an ActorSystem.
@@ -214,7 +216,8 @@ func (s *ActorSystem) StopAll(timeout time.Duration) error {
 	var errs []error
 
 	for _, e := range entries {
-		if err := e.managed.Stop(timeout); err != nil {
+		// An actor that already terminated (e.g. panicked) needs no stopping.
+		if err := e.managed.Stop(timeout); err != nil && !errors.Is(err, actor.ErrActorNotRunning) {
 			errs = append(errs, err)
 		}
 		s.emitEvent(Event{Kind: EventActorStopped, ActorName: e.name})

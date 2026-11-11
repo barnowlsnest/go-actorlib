@@ -566,3 +566,72 @@ func (s *SupervisorTestSuite) TestRealActorPanic_ShouldRestartChild() {
 
 	s.NoError(sup.StopAll(time.Second))
 }
+
+func (s *SupervisorTestSuite) TestAllForOne_RealActorPanic_ShouldNotReportRestartError() {
+	// Arrange
+	sup := NewSupervisor(WithPolicy(RestartPolicy{Strategy: AllForOne}))
+	failing := &panickingOnceSpec{}
+	s.Require().NoError(sup.Add("failing", failing))
+	s.Require().NoError(sup.Add("sibling", &actorStartNewSpec{}))
+
+	var restartErrs []error
+	var mu sync.Mutex
+	sup.OnRestartError(func(_ string, err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		restartErrs = append(restartErrs, err)
+	})
+
+	// Act
+	s.Require().NoError(sup.StartAll(s.ctx, 0))
+	s.Eventually(func() bool { return failing.starts.Load() == 2 }, time.Second, 10*time.Millisecond)
+	s.Eventually(func() bool {
+		state, err := sup.ChildState("sibling")
+		return err == nil && state == uint64(actor.Started)
+	}, time.Second, 10*time.Millisecond)
+
+	// Assert
+	mu.Lock()
+	s.Empty(restartErrs)
+	mu.Unlock()
+	s.NoError(sup.StopAll(time.Second))
+}
+
+func (s *SupervisorTestSuite) TestStopAll_WithCleanlyStoppedChild_ShouldNotReportError() {
+	// Arrange
+	sup := NewSupervisor()
+	spec := &recordingStartNewSpec{}
+	s.Require().NoError(sup.Add("worker", spec))
+	s.Require().NoError(sup.StartAll(s.ctx, 0))
+
+	ref := spec.last()
+	s.Require().NoError(ref.Stop(time.Second))
+
+	// Act
+	err := sup.StopAll(time.Second)
+
+	// Assert
+	s.NoError(err)
+}
+
+type recordingStartNewSpec struct {
+	mu  sync.Mutex
+	ref ChildRef
+}
+
+func (r *recordingStartNewSpec) Start(ctx context.Context) (ChildRef, error) {
+	ref, err := (&actorStartNewSpec{}).Start(ctx)
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	r.ref = ref
+	r.mu.Unlock()
+	return ref, nil
+}
+
+func (r *recordingStartNewSpec) last() ChildRef {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.ref
+}

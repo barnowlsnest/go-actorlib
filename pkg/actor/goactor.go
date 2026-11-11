@@ -493,10 +493,11 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 // It can only be called on actors in the Started state.
 //
 // Returns [ErrActorGracefulStopTimeout] if the actor does not terminate within
-// the timeout, or an error if the actor is not in the correct state for stopping.
+// the timeout, or an error wrapping [ErrActorNotRunning] if the actor is not
+// in the Started state (never started, already stopping, or terminated).
 func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 	if !atomic.CompareAndSwapUint64(&ga.state, Started, Stopping) {
-		return fmt.Errorf("actor state mismatch: expected %d, got %d", Started, atomic.LoadUint64(&ga.state))
+		return fmt.Errorf("%w: state %s", ErrActorNotRunning, stateName(atomic.LoadUint64(&ga.state)))
 	}
 
 	close(ga.stop)
@@ -634,6 +635,28 @@ func (ga *GoActor[T]) cancelExecutable(e Executable[T]) {
 	}()
 
 	c.Cancel(ErrActorCommandDropped)
+}
+
+// stateName returns a human-readable name for an actor state.
+func stateName(state uint64) string {
+	switch state {
+	case Initialized:
+		return "Initialized"
+	case Started:
+		return "Started"
+	case Stopping:
+		return "Stopping"
+	case Done:
+		return "Done"
+	case StoppedWithError:
+		return "StoppedWithError"
+	case Canceled:
+		return "Canceled"
+	case Panicked:
+		return "Panicked"
+	default:
+		return fmt.Sprintf("Unknown(%d)", state)
+	}
 }
 
 // panicked reports whether a recovered panic has moved the actor to the Panicked state.

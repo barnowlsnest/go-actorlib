@@ -313,7 +313,7 @@ func (s *Supervisor) restartAll(ctx context.Context) {
 		ref := c.ref
 		s.mu.Unlock()
 		if ref != nil {
-			if err := ref.Stop(s.stopTimeout); err != nil {
+			if err := stopChild(ref, s.stopTimeout); err != nil {
 				s.notifyRestartError(c.name, err)
 			}
 		}
@@ -346,7 +346,7 @@ func (s *Supervisor) StopAll(timeout time.Duration) error {
 		ref := c.ref
 		s.mu.Unlock()
 		if ref != nil {
-			if err := ref.Stop(timeout); err != nil {
+			if err := stopChild(ref, timeout); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -382,4 +382,12 @@ func (s *Supervisor) ChildState(name string) (uint64, error) {
 		return actor.Initialized, nil
 	}
 	return c.ref.State(), nil
+}
+
+// stopChild stops ref, treating a child that already terminated as success.
+func stopChild(ref ChildRef, timeout time.Duration) error {
+	if err := ref.Stop(timeout); err != nil && !errors.Is(err, actor.ErrActorNotRunning) {
+		return err
+	}
+	return nil
 }

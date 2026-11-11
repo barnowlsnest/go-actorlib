@@ -894,3 +894,25 @@ func BenchmarkStopAll(b *testing.B) {
 		_ = systems[n].StopAll(100 * time.Millisecond)
 	}
 }
+
+type panicCmd struct{}
+
+func (panicCmd) Execute(context.Context, *testEntity) { panic("boom") }
+
+func (s *ActorSystemTestSuite) TestStopAll_WithAlreadyTerminatedActor_ShouldNotReportError() {
+	// Arrange
+	sys := New()
+	ref, err := Spawn(sys, s.ctx, "crashy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	s.Require().NoError(err)
+	_, err = Spawn(sys, s.ctx, "healthy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	s.Require().NoError(err)
+
+	s.Require().NoError(ref.Send(s.ctx, panicCmd{}))
+	<-ref.Done()
+
+	// Act
+	err = sys.StopAll(time.Second)
+
+	// Assert
+	s.NoError(err)
+}
