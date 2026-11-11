@@ -48,8 +48,6 @@ More diagrams: [`docs/`](docs/README.md).
 
 Go already has goroutines, channels, and `sync.Mutex`. Use this library when you want exclusive state ownership plus structured lifecycle.
 
-![Benefits and limitations of go-actorlib](assets/illustrations/tradeoffs.svg)
-
 ### Pros
 
 - **No locks, no data races by design.** Each actor owns its state. Deadlocks, forgotten mutexes, and lock-ordering bugs are prevented by structure, not discipline.
@@ -66,6 +64,8 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 - **Debugging indirection.** Stack traces stop at channel operations. Cross-actor requests need correlation IDs or structured logs.
 - **Single process.** Actors talk over in-process channels. There is no remoting or clustering.
 - **Dead letters are opt-in.** Failed sends are returned to the caller; nothing is published to the dead-letter queue automatically.
+
+![When go-actorlib is a good fit and when it is not](assets/illustrations/fit.svg)
 
 ### When to use
 
