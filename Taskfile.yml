@@ -44,11 +44,6 @@ tasks:
       - docker run --rm -v "$PWD/docs:/data" -v "$PWD/assets/diagrams:/out" plantuml/plantuml:1.2024.7 -tpng -o /out '/data/*.puml'
       - mv -f assets/diagrams/go-actorlib-architecture.png assets/diagrams/architecture.png
 
-  docs-animations:
-    desc: Generate README animated SVGs and illustrations in assets/ (requires Python 3)
-    cmds:
-      - python3 scripts/gen_readme_svgs.py assets
-
   sanity:
     desc: Run all checks (fmt, build, test, vet)
     deps:
