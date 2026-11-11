@@ -468,48 +468,98 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 			return
 		}
 
-		for {
-			select {
-			case <-ctx.Done():
-				a.handleCtxErr(ctx.Err())
-				return
-			case <-a.stop:
-				func(e T) {
-					defer a.catchPanic()
-					a.hooks.BeforeStop(e)
-				}(entity)
-				return
-			case e := <-a.input:
-				select {
-				case <-ctx.Done():
-					// Record the terminal state first: Cancel may call back into
-					// the actor and must see it as no longer Started.
-					a.handleCtxErr(ctx.Err())
-					a.cancelExecutable(e)
-					return
-				case <-a.stop:
-					a.cancelExecutable(e)
-					func(e T) {
-						defer a.catchPanic()
-						a.hooks.BeforeStop(e)
-					}(entity)
-					return
-				default:
-					func() {
-						defer a.catchPanic()
-						a.behavior.Current()(actorScopedCtx, e, entity)
-					}()
-
-					// A recovered panic is terminal: exit so Done closes and
-					// supervisors observe the failure.
-					if a.panicked() {
-						return
-					}
-				}
-			}
-		}
+		a.loop(ctx, actorScopedCtx, entity)
 	}(ctx, entity)
 	return nil
+}
+
+// loop processes commands sequentially until Stop, ctx cancellation, or a panic.
+//
+// The per-message path avoids multi-case selects: selectgo locks every channel
+// it names, so the old loop (a blocking 3-case select plus a 3-case select with
+// default per message) fought senders for the mailbox lock and spent most of
+// its CPU spinning in runtime.lock2. Now each message costs one non-blocking
+// receive on input plus two non-blocking receives on ctx.Done and stop, which
+// are lock-free while those channels are open. The blocking select runs only
+// when the mailbox is empty.
+func (a *Actor[T]) loop(ctx, actorScopedCtx context.Context, entity T) {
+	ctxDone := ctx.Done() // nil for a non-cancelable ctx: never ready
+
+	for {
+		e, ok := a.next(ctx, ctxDone, entity)
+		if !ok {
+			return
+		}
+
+		if a.interrupted(ctx, ctxDone, e, entity) {
+			return
+		}
+
+		func() {
+			defer a.catchPanic()
+			a.behavior.Current()(actorScopedCtx, e, entity)
+		}()
+
+		// A recovered panic is terminal: exit so Done closes and
+		// supervisors observe the failure.
+		if a.panicked() {
+			return
+		}
+	}
+}
+
+// next returns the next queued command, blocking while the mailbox is empty.
+// It returns false once the loop must exit because ctx is done or Stop was called.
+func (a *Actor[T]) next(ctx context.Context, ctxDone <-chan struct{}, entity T) (Executable[T], bool) {
+	// Fast path: a single-channel non-blocking receive takes only the mailbox lock.
+	select {
+	case e := <-a.input:
+		return e, true
+	default:
+	}
+
+	select {
+	case <-ctxDone:
+		a.handleCtxErr(ctx.Err())
+		return nil, false
+	case <-a.stop:
+		a.beforeStop(entity)
+		return nil, false
+	case e := <-a.input:
+		return e, true
+	}
+}
+
+// interrupted reports whether ctx is done or Stop was called after e was
+// dequeued. If so, it records the terminal state and cancels e instead of
+// running it, so commands still queued at Stop are canceled rather than run
+// (see the TestDrain_* tests).
+func (a *Actor[T]) interrupted(ctx context.Context, ctxDone <-chan struct{}, e Executable[T], entity T) bool {
+	select {
+	case <-ctxDone:
+		// Record the terminal state first: Cancel may call back into
+		// the actor and must see it as no longer Started.
+		a.handleCtxErr(ctx.Err())
+		a.cancelExecutable(e)
+		return true
+	default:
+	}
+
+	select {
+	case <-a.stop:
+		a.cancelExecutable(e)
+		a.beforeStop(entity)
+		return true
+	default:
+	}
+
+	return false
+}
+
+// beforeStop runs the BeforeStop hook, recovering a panic in it.
+func (a *Actor[T]) beforeStop(entity T) {
+	defer a.catchPanic()
+	a.hooks.BeforeStop(entity)
 }
 
 // Stop gracefully shuts down the actor within the specified timeout.
