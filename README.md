@@ -426,7 +426,7 @@ Please do not commit generated coverage files or editor config (see `.gitignore`
 
 ## License
 
-[MIT](LICENSE) © 2025 Barn Owls Nest
+[MIT](LICENSE) © 2026 Barn Owls Nest
 
 ## References
 
