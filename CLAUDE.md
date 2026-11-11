@@ -85,7 +85,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
 - **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
-- **`stopManaged`** — `StopAll`'s per-actor stop. `actor.ErrActorNotRunning` is not proof of exit (also returned for Stopping, and for StoppedWithError after a timed-out Stop whose goroutine is still running). If the actor exposes `Done()` (`actorref.Ref` does) it waits via `stopwait.Wait`; otherwise only Done / Canceled / Panicked count as stopped.
+- **`stopManaged`** — `StopAll`'s per-actor stop. `actor.ErrActorNotRunning` is not proof of exit (also returned for Stopping, and for StoppedWithError after a timed-out Stop whose goroutine is still running). If the actor exposes `Done()` (`actorref.Ref` does) it waits via `stopwait.Wait`; otherwise only Done / Canceled / Panicked count as stopped. A never-started (Initialized) actor returns its `ErrActorNotRunning` immediately — its `Done()` would never close.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
 
 ### `pkg/supervision` — Supervisor for actor lifecycle management
@@ -98,7 +98,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
-- **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` via `stopwait.Wait` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances.
+- **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` via `stopwait.Wait` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances. Initialized children return the error immediately.
 
 ### `internal/stopwait` — Shared shutdown wait
 
