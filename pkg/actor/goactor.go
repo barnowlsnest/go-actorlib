@@ -106,6 +106,15 @@ type (
 	// command still queued in its mailbox is drained; those implementing
 	// Cancelable receive Cancel with [ErrActorCommandDropped]. Executables
 	// that do not implement it are discarded silently.
+	//
+	// Cancel runs on the actor's goroutine before Done is closed, so that a
+	// closed Done means every accepted command has been executed or canceled.
+	// It must therefore return promptly and must not block on the actor itself
+	// (for example by waiting on its Done channel): a blocking Cancel delays
+	// termination and makes Stop time out. Calling Receive or Stop on the same
+	// actor is safe — they return ErrActorReceiveOnStopped / an error instead
+	// of blocking. A panic in Cancel is recovered and reported via OnError;
+	// the remaining queued commands are still canceled.
 	Cancelable interface {
 		Cancel(err error)
 	}
