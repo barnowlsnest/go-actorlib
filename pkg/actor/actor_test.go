@@ -504,6 +504,39 @@ func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	s.Equal(ErrActorReceiveOnStopped, err)
 }
 
+func (s *GoActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast() {
+	for _, timeout := range []time.Duration{0, time.Second} {
+		// Arrange - mailbox has room, so only the ctx check can reject the send
+		actor, err := New(
+			WithProvider[*TestEntity](s.provider),
+			WithInputBufferSize[*TestEntity](128),
+			WithReceiveTimeout[*TestEntity](timeout),
+		)
+		s.NoError(err)
+		s.NoError(actor.Start(s.ctx))
+		s.NoError(actor.WaitReady(s.ctx, 100*time.Millisecond))
+
+		canceled, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		var executed atomic.Int32
+		command := NewTestCommand("test", func(context.Context, *TestEntity) {
+			executed.Add(1)
+		})
+
+		// Act - repeat so a random select choice could not pass by chance
+		for range 100 {
+			err = actor.Receive(canceled, command)
+
+			// Assert
+			s.ErrorIs(err, context.Canceled, "timeout=%v", timeout)
+		}
+
+		s.NoError(actor.Stop(time.Second))
+		s.Zero(executed.Load(), "timeout=%v", timeout)
+	}
+}
+
 func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 	// Arrange - zero timeout means no timeout
 	actor, err := New(

@@ -371,6 +371,25 @@ func (a *Actor[T]) Receive(ctx context.Context, e Executable[T]) error {
 		return ErrActorReceiveOnStopped
 	}
 
+	// Fail fast on a done ctx. Without this, the fast path below would enqueue
+	// whenever the mailbox has room, and the select after it would pick at
+	// random between enqueuing and ctx.Done().
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Fast path: when the mailbox has room, enqueue without arming a timer.
+	// time.NewTimer costs 3 allocs (248 B) and ~225 ns per call on the default
+	// 5s timeout, even though it almost never fires
+	// (BenchmarkReceive_MailboxHasRoom: 401 ns/3 allocs -> 175 ns/0 allocs).
+	// Accepted commands are still covered by sendMu + drain, so a concurrent
+	// Stop either executes or cancels this one.
+	select {
+	case a.input <- e:
+		return nil
+	default:
+	}
+
 	t := a.receiveTimeout
 
 	if t == 0 {
