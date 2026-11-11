@@ -34,7 +34,7 @@
 <text class="ok" x="42" y="152" font-weight="700" font-size="14">✓</text>
 <text class="small" x="64" y="152" font-size="13">Typed entities and commands (generics)</text>
 <text class="ok" x="42" y="184" font-weight="700" font-size="14">✓</text>
-<text class="small" x="64" y="184" font-size="13">Supervision: restart failed actors</text>
+<text class="small" x="64" y="184" font-size="13">Panics contained: Recovery + supervisor restarts</text>
 <text class="ok" x="42" y="216" font-weight="700" font-size="14">✓</text>
 <text class="small" x="64" y="216" font-size="13">Structured start / stop, graceful shutdown</text>
 <text class="ok" x="42" y="248" font-weight="700" font-size="14">✓</text>
@@ -48,7 +48,7 @@
 <text class="bad" x="462" y="152" font-weight="700" font-size="14">✕</text>
 <text class="small" x="484" y="152" font-size="13">Full mailbox: senders block, then time out</text>
 <text class="bad" x="462" y="184" font-weight="700" font-size="14">✕</text>
-<text class="small" x="484" y="184" font-size="13">A panic stops the actor (use Recovery or a supervisor)</text>
+<text class="small" x="484" y="184" font-size="13">In-memory state only: no built-in persistence</text>
 <text class="bad" x="462" y="216" font-weight="700" font-size="14">✕</text>
 <text class="small" x="484" y="216" font-size="13">Stack traces stop at the channel boundary</text>
 <text class="bad" x="462" y="248" font-weight="700" font-size="14">✕</text>
