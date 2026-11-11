@@ -99,13 +99,13 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
 - **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` via `stopwait.Wait` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances. Initialized children return the error immediately.
+- **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
+- Version-tracked monitors prevent stale restart cascades.
+- Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
 
 ### `internal/stopwait` — Shared shutdown wait
 
 - **`Wait(done, timeout, cause)`** — nil once `done` closes, else an error wrapping `actor.ErrActorGracefulStopTimeout` and `cause`. Checks `done` before arming the timer, so a closed `done` wins even with `timeout <= 0`.
-- **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
-- Version-tracked monitors prevent stale restart cascades.
-- Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
 
 ### `pkg/middleware` — Reference middleware implementations
 
