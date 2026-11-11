@@ -34,7 +34,7 @@ go test -fuzz FuzzConcurrentStopAndSend -fuzztime 5s ./pkg/actor/
 
 ## Architecture
 
-Ten packages under `pkg/`.
+Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actor` — Core actor implementation
 
@@ -84,7 +84,8 @@ Ten packages under `pkg/`.
 - **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
 - **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
-- Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events; ignores `actor.ErrActorNotRunning` from actors that already terminated), `OnEvent`.
+- Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
+- **`stopManaged`** — `StopAll`'s per-actor stop. `actor.ErrActorNotRunning` is not proof of exit (also returned for Stopping, and for StoppedWithError after a timed-out Stop whose goroutine is still running). If the actor exposes `Done()` (`actorref.Ref` does) it waits via `stopwait.Wait`; otherwise only Done / Canceled / Panicked count as stopped.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
 
 ### `pkg/supervision` — Supervisor for actor lifecycle management
@@ -97,7 +98,11 @@ Ten packages under `pkg/`.
 - Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
-- **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances.
+- **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` via `stopwait.Wait` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances.
+
+### `internal/stopwait` — Shared shutdown wait
+
+- **`Wait(done, timeout, cause)`** — nil once `done` closes, else an error wrapping `actor.ErrActorGracefulStopTimeout` and `cause`. Checks `done` before arming the timer, so a closed `done` wins even with `timeout <= 0`.
 - **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.

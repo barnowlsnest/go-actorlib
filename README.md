@@ -181,7 +181,7 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 - **Start once.** `Start` succeeds at most once; concurrent or repeated calls return `ErrActorAlreadyStarted`. A `Start` that fails validation (`ErrActorNilEntity`) may be retried.
 - **Panics are terminal.** A panic recovered from a handler or the `AfterStart` hook moves the actor to `Panicked` and ends its goroutine; `Done()` closes. Use the `Recovery` middleware to keep the actor alive instead.
 - **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and every queued command is canceled with `ErrActorCommandDropped` (see [Commands](#commands)).
-- **Stop errors.** `Stop` returns `ErrActorGracefulStopTimeout` if the actor does not finish within the timeout (state `StoppedWithError`), and an error wrapping `ErrActorNotRunning` if the actor is not `Started` (never started, already stopping, or terminated). `system.StopAll` and `supervision.Supervisor.StopAll` treat `ErrActorNotRunning` as already stopped.
+- **Stop errors.** `Stop` returns `ErrActorGracefulStopTimeout` if the actor does not finish within the timeout (state `StoppedWithError`), and an error wrapping `ErrActorNotRunning` if the actor is not `Started` (never started, already stopping, or terminated). `system.StopAll` and `supervision.Supervisor.StopAll` treat `ErrActorNotRunning` as already stopped once the actor has actually exited (`Done()` closed), waiting up to their timeout for it.
 
 ### Actor system
 
@@ -215,7 +215,7 @@ sys.OnEvent(func(e system.Event) {
 sys.StopAll(10 * time.Second) // LIFO, then the system is stopped
 ```
 
-`StopAll` skips actors that already terminated on their own (for example after a panic) without reporting an error.
+`StopAll` skips actors that already terminated on their own (for example after a panic) without reporting an error. An actor that is still running despite an earlier timed-out `Stop` is waited on, and reported with `ErrActorGracefulStopTimeout` if it does not exit within the timeout.
 
 Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
