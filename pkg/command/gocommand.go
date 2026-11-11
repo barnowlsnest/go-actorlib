@@ -219,3 +219,22 @@ func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 		return
 	}
 }
+
+// Cancel marks a command that has not started executing as Canceled with err
+// and closes the Done channel without sending a value.
+//
+// It implements [actor.Cancelable]: actors call it for commands still queued
+// when they terminate, passing [actor.ErrActorCommandDropped]. Cancel is a
+// no-op once the command has started executing or was already canceled.
+func (gc *GoCommand[E, R]) Cancel(err error) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	if gc.state != Created {
+		return
+	}
+
+	gc.state = Canceled
+	gc.err = err
+	close(gc.done)
+}

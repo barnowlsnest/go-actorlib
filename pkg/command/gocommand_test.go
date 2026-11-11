@@ -556,3 +556,38 @@ func BenchmarkGoCommand_ConcurrentStateAccess(b *testing.B) {
 		}
 	})
 }
+
+func (s *GoCommandTestSuite) TestCancel_BeforeExecute_ShouldCloseDoneWithError() {
+	// Arrange
+	cmd := New(func(_ *TestEntity) (string, error) { return "never", nil })
+	cause := errors.New("dropped")
+
+	// Act
+	cmd.Cancel(cause)
+
+	// Assert
+	_, ok := <-cmd.Done()
+	s.False(ok)
+	s.Equal(Canceled, cmd.State())
+	s.ErrorIs(cmd.Error(), cause)
+}
+
+func (s *GoCommandTestSuite) TestCancel_AfterExecute_ShouldBeNoOp() {
+	// Arrange
+	cmd := New(func(_ *TestEntity) (string, error) { return "ok", nil })
+	cmd.Execute(s.ctx, NewTestEntity("v", true))
+
+	// Act
+	s.NotPanics(func() { cmd.Cancel(errors.New("late")) })
+
+	// Assert
+	s.Equal(Finished, cmd.State())
+	s.NoError(cmd.Error())
+	s.Equal("ok", <-cmd.Done())
+}
+
+func (s *GoCommandTestSuite) TestCancel_Twice_ShouldNotPanic() {
+	cmd := New(func(_ *TestEntity) (string, error) { return "", nil })
+	cmd.Cancel(errors.New("first"))
+	s.NotPanics(func() { cmd.Cancel(errors.New("second")) })
+}

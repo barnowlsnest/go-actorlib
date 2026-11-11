@@ -271,3 +271,38 @@ func BenchmarkNew_Success(b *testing.B) {
 		b.Fatal(err)
 	}
 }
+
+func (s *GoAskTestSuite) TestAwait_QueuedWhenActorStops_ShouldReturnDroppedErrorPromptly() {
+	// Arrange — occupy the actor so the ask stays queued
+	started, release := make(chan struct{}), make(chan struct{})
+	blocker := command.New(func(_ *TestEntity) (struct{}, error) {
+		close(started)
+		<-release
+		return struct{}{}, nil
+	})
+	s.Require().NoError(s.ref.Send(s.ctx, blocker))
+	<-started
+
+	queued := command.New(func(_ *TestEntity) (int, error) { return 1, nil })
+	s.Require().NoError(s.ref.Send(s.ctx, queued))
+
+	type result struct{ err error }
+	results := make(chan result, 1)
+	go func() {
+		_, err := Await(s.ctx, queued, 5*time.Second)
+		results <- result{err}
+	}()
+
+	// Act
+	go func() { _ = s.ref.Stop(time.Second) }()
+	s.Require().Eventually(func() bool { return s.actor.State() == actor.Stopping }, time.Second, time.Millisecond)
+	close(release)
+
+	// Assert
+	select {
+	case r := <-results:
+		s.ErrorIs(r.err, actor.ErrActorCommandDropped)
+	case <-time.After(time.Second):
+		s.FailNow("ask did not return after actor stopped")
+	}
+}

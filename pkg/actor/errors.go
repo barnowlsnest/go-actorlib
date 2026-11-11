@@ -46,4 +46,8 @@ var (
 	// ErrActorReceiveOnStopped is returned when attempting to send commands to a stopped actor.
 	// Actors in Stopping, Done, StoppedWithError, Canceled, or Panicked states cannot receive messages.
 	ErrActorReceiveOnStopped = errors.New("actor receive on stopped actor")
+
+	// ErrActorCommandDropped is passed to [Cancelable.Cancel] for commands that were
+	// accepted by Receive but never executed because the actor terminated first.
+	ErrActorCommandDropped = errors.New("actor terminated before executing command")
 )

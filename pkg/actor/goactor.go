@@ -40,6 +40,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -98,6 +99,17 @@ type (
 		Execute(context.Context, T)
 	}
 
+	// Cancelable is an optional interface for executables that must be notified
+	// when they are accepted by Receive but never executed.
+	//
+	// When an actor terminates (Stop, context cancellation, or panic), every
+	// command still queued in its mailbox is drained; those implementing
+	// Cancelable receive Cancel with [ErrActorCommandDropped]. Executables
+	// that do not implement it are discarded silently.
+	Cancelable interface {
+		Cancel(err error)
+	}
+
 	// Hooks defines lifecycle event handlers for actors.
 	//
 	// These methods are called at specific points in an actor's lifecycle,
@@ -151,10 +163,16 @@ type (
 		inputBufSize   int
 		state          uint64
 
-		input chan Executable[T]
-		done  chan struct{}
-		ready chan struct{}
-		stop  chan struct{}
+		input   chan Executable[T]
+		done    chan struct{}
+		ready   chan struct{}
+		stop    chan struct{}
+		exiting chan struct{} // closed when the loop exits, before draining
+
+		// sendMu serializes mailbox sends (read lock) against the final drain
+		// (write lock) so no accepted command is lost after termination.
+		sendMu sync.RWMutex
+		closed bool
 
 		hooks    Hooks
 		provider EntityProvider[T]
@@ -204,6 +222,7 @@ func New[T Entity](opts ...GoActorOption[T]) (*GoActor[T], error) {
 	actor.done = make(chan struct{})
 	actor.ready = make(chan struct{})
 	actor.stop = make(chan struct{})
+	actor.exiting = make(chan struct{})
 	actor.state = Initialized
 
 	return actor, nil
@@ -266,6 +285,8 @@ func (ga *GoActor[T]) processExecutable(ctx context.Context, e Executable[T]) er
 		return nil
 	case <-ga.stop:
 		return ErrActorReceiveOnStopped
+	case <-ga.exiting:
+		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -278,6 +299,8 @@ func (ga *GoActor[T]) processExecutableWithTimeout(ctx context.Context, e Execut
 	case ga.input <- e:
 		return nil
 	case <-ga.stop:
+		return ErrActorReceiveOnStopped
+	case <-ga.exiting:
 		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
@@ -327,6 +350,13 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	case Initialized:
 		return ErrActorNotStarted
 	default:
+		return ErrActorReceiveOnStopped
+	}
+
+	ga.sendMu.RLock()
+	defer ga.sendMu.RUnlock()
+
+	if ga.closed {
 		return ErrActorReceiveOnStopped
 	}
 
@@ -383,6 +413,7 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 
 	go func(ctx context.Context, entity T) {
 		defer close(ga.done)
+		defer ga.drain()
 
 		// Enrich context with actor context for handlers and middleware
 		actorScopedCtx := withGoActorContext(ctx, ga.actorCtx)
@@ -413,9 +444,11 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 			case e := <-ga.input:
 				select {
 				case <-ctx.Done():
+					ga.cancelExecutable(e)
 					ga.handleCtxErr(ctx.Err())
 					return
 				case <-ga.stop:
+					ga.cancelExecutable(e)
 					func(e T) {
 						defer ga.catchPanic()
 						ga.hooks.BeforeStop(e)
@@ -549,6 +582,43 @@ func WithHooks[T Entity](hooks Hooks) GoActorOption[T] {
 		actor.hooks = hooks
 		return actor
 	}
+}
+
+// drain runs on the actor goroutine when the loop exits. It wakes blocked senders,
+// waits for in-flight sends to finish, rejects further sends, and cancels every
+// command left in the mailbox.
+func (ga *GoActor[T]) drain() {
+	close(ga.exiting)
+
+	ga.sendMu.Lock()
+	ga.closed = true
+	ga.sendMu.Unlock()
+
+	for {
+		select {
+		case e := <-ga.input:
+			ga.cancelExecutable(e)
+		default:
+			return
+		}
+	}
+}
+
+// cancelExecutable notifies a dropped command if it implements Cancelable.
+// A panic in Cancel is reported via OnError without changing the actor state.
+func (ga *GoActor[T]) cancelExecutable(e Executable[T]) {
+	c, ok := e.(Cancelable)
+	if !ok {
+		return
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			ga.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", r)))
+		}
+	}()
+
+	c.Cancel(ErrActorCommandDropped)
 }
 
 // panicked reports whether a recovered panic has moved the actor to the Panicked state.
