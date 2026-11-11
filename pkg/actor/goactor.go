@@ -453,8 +453,10 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 			case e := <-ga.input:
 				select {
 				case <-ctx.Done():
-					ga.cancelExecutable(e)
+					// Record the terminal state first: Cancel may call back into
+					// the actor and must see it as no longer Started.
 					ga.handleCtxErr(ctx.Err())
+					ga.cancelExecutable(e)
 					return
 				case <-ga.stop:
 					ga.cancelExecutable(e)

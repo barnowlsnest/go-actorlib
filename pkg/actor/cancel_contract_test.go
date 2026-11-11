@@ -157,3 +157,63 @@ func TestDrain_WhenCancelPanics_ShouldStillCancelRemainingCommandsAndReportError
 	}
 	require.True(t, found, "Cancel panic should be reported via OnError")
 }
+
+// On the ctx path the loop may dequeue a command after ctx is done and cancel it
+// from inside the loop; the actor must already be in a terminal state then, so
+// re-entrant calls from Cancel are rejected instead of waiting on the actor.
+// Each iteration races ctx.Done against the queued command, so repeat it.
+
+func TestDrain_WhenCancelStopsSameActorOnContextCancel_ShouldNotWait(t *testing.T) {
+	for range 50 {
+		// Arrange
+		ctx, cancel := context.WithCancel(context.Background())
+		a, release := startBlocked(t, ctx)
+
+		stopTook := make(chan time.Duration, 1)
+		var reentrantErr atomic.Value
+		reentrant := &funcCancelCommand{cancelFn: func(error) {
+			start := time.Now()
+			reentrantErr.Store(a.Stop(time.Second))
+			stopTook <- time.Since(start)
+		}}
+		require.NoError(t, a.Receive(context.Background(), reentrant))
+
+		// Act
+		cancel()
+		close(release)
+		waitDone(t, a)
+
+		// Assert
+		took := <-stopTook
+		require.Less(t, took, 100*time.Millisecond, "Stop from Cancel waited on the actor running Cancel")
+		require.Error(t, reentrantErr.Load().(error))
+		require.NotErrorIs(t, reentrantErr.Load().(error), ErrActorGracefulStopTimeout)
+		require.Equal(t, uint64(Canceled), a.State())
+	}
+}
+
+func TestDrain_WhenCancelReceivesOnSameActorOnContextCancel_ShouldBeRejected(t *testing.T) {
+	for range 50 {
+		// Arrange — no receive timeout, so a send that is wrongly allowed into a
+		// full mailbox would block the actor goroutine forever.
+		ctx, cancel := context.WithCancel(context.Background())
+		a, release := startBlocked(t, ctx,
+			WithInputBufferSize[*TestEntity](1),
+			WithReceiveTimeout[*TestEntity](0),
+		)
+
+		var reentrantErr atomic.Value
+		reentrant := &funcCancelCommand{cancelFn: func(error) {
+			reentrantErr.Store(a.Receive(context.Background(), &funcCancelCommand{}))
+		}}
+		require.NoError(t, a.Receive(context.Background(), reentrant))
+
+		// Act
+		cancel()
+		close(release)
+		waitDone(t, a)
+
+		// Assert
+		require.ErrorIs(t, reentrantErr.Load().(error), ErrActorReceiveOnStopped)
+	}
+}
