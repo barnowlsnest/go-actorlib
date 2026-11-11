@@ -52,5 +52,5 @@
 <text class="bad" x="462" y="216" font-weight="700" font-size="14">✕</text>
 <text class="small" x="484" y="216" font-size="13">Stack traces stop at the channel boundary</text>
 <text class="bad" x="462" y="248" font-weight="700" font-size="14">✕</text>
-<text class="small" x="484" y="248" font-size="13">Overkill for a counter or simple fan-out</text>
+<text class="small" x="484" y="248" font-size="13">Actors Asking each other block until timeout</text>
 </svg>

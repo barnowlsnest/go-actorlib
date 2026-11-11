@@ -61,7 +61,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 
 ### Cons
 
-- **Overhead for trivial concurrency.** A `sync.Mutex` or a bare channel is lighter for a counter or a simple fan-out.
+- **Ask cycles block.** If actor A `Ask`s B while B `Ask`s A, both handlers wait until the ask timeout (`ErrAskTimeout`). Use `Send` in at least one direction.
 - **Latency from message passing.** Every interaction is a channel send plus sequential processing. Hot shared reads are faster with `sync.RWMutex` or `sync/atomic`.
 - **Debugging indirection.** Stack traces stop at channel operations. Cross-actor requests need correlation IDs or structured logs.
 - **Single process.** Actors talk over in-process channels. There is no remoting or clustering.
@@ -80,6 +80,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 
 - Request-scoped concurrency — `sync.WaitGroup` or `errgroup` is enough
 - Read-heavy, write-rare shared state — `sync.RWMutex` or `atomic.Value`
+- Trivial shared state such as a single counter — `sync.Mutex` or `sync/atomic`
 - Fire-and-forget work — a goroutine and a channel
 - CPU-bound pipelines — worker pools and fan-out / fan-in
 
