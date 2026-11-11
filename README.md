@@ -16,7 +16,7 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 - **Command & Ask** — async result channels, or single-call request/response via `ref.Ask` / `sys.Ask`
 - **Actor System** — name registry; `Spawn`, typed `Send`/`Ask` as generic methods; event bus, LIFO shutdown
 - **Supervision** — OneForOne / AllForOne, death watch, restart-frequency limits
-- **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
+- **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `ActorContext`
 - **Middleware** — logging, metrics, and panic recovery (`go-logslib`)
 - **Dead letters** — queue for undeliverable messages with handlers
 - **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `Actor`)
@@ -267,16 +267,16 @@ func (s *MyChildSpec) Start(ctx context.Context) (supervision.ChildRef, error) {
 ```go
 func initialHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[MyEntity](ctx).Become(authenticatedHandler)
+    actor.GetActorContext[MyEntity](ctx).Become(authenticatedHandler)
 }
 
 func authenticatedHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[MyEntity](ctx).Unbecome()
+    actor.GetActorContext[MyEntity](ctx).Unbecome()
 }
 ```
 
-`GoActorContext` is valid only while the current message is processed. `Unbecome` will not pop the base handler.
+`ActorContext` is valid only while the current message is processed. `Unbecome` will not pop the base handler.
 
 ### Middleware
 
@@ -342,7 +342,7 @@ msg, ok := mb.Pop() // systemCmd
 
 | Package | Description |
 |---|---|
-| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
+| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `ActorContext`, middleware, `StartNew` |
 | [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actorref) | Typed `Ref`: `Send`, `Ask`, `Stop`, `State`, `Done` |
 | [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/command) | `Command` with `DelegateFn` and a result channel |
 | [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/ask) | `Await` (shared wait behind `Ref.Ask` / `ActorSystem.Ask`), `ErrAskTimeout` |

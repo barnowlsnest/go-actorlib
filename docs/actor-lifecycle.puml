@@ -5,7 +5,7 @@ skinparam backgroundColor #FFFFFF
 title Actor Lifecycle State Machine
 
 state "Initialized" as init : Actor created but not started\n(ready, done, stop channels allocated)
-state "Started" as started : Processing messages from input channel\nBehaviorStack active, GoActorContext injected
+state "Started" as started : Processing messages from input channel\nBehaviorStack active, ActorContext injected
 state "Stopping" as stopping : Stop channel closed\nNo new messages accepted
 state "Done" as done : Successfully stopped
 state "StoppedWithError" as error : Stopped due to error
@@ -50,7 +50,7 @@ note right of started
 
   **Hooks:** BeforeStart, AfterStart
   **Middleware:** chain applied to handler
-  **GoActorContext:** injected via context.WithValue
+  **ActorContext:** injected via context.WithValue
 end note
 
 note right of stopping

@@ -47,7 +47,7 @@ package "Actor Core (pkg/actor)" {
     -hooks Hooks
     -provider EntityProvider<T>
     -behavior *BehaviorStack<T>
-    -actorCtx *GoActorContext<T>
+    -actorCtx *ActorContext<T>
     -middleware []Middleware<T>
     --
     +{static} New(opts...) (*Actor<T>, error)
@@ -79,7 +79,7 @@ package "Actor Core (pkg/actor)" {
     +Depth() int
   }
 
-  class "GoActorContext<T>" as GoActorContext {
+  class "ActorContext<T>" as ActorContext {
     -behavior *BehaviorStack<T>
     -name string
     --
@@ -88,10 +88,10 @@ package "Actor Core (pkg/actor)" {
     +Unbecome() bool
     +Name() string
     ..
-    +{static} GetGoActorContext<T>(ctx) *GoActorContext<T>
+    +{static} GetActorContext<T>(ctx) *ActorContext<T>
   }
 
-  class "GoActorOption<T>" as GoActorOption <<type>> {
+  class "Option<T>" as Option <<type>> {
     +WithProvider(EntityProvider<T>)
     +WithInputBufferSize(int)
     +WithReceiveTimeout(time.Duration)
@@ -264,7 +264,7 @@ Ref ..|> ChildRef
 Actor *-- EntityProvider
 Actor *-- Hooks
 Actor *-- BehaviorStack
-Actor *-- GoActorContext
+Actor *-- ActorContext
 Actor o-- Executable : processes
 Actor o-- MiddlewareType : chains
 Command *-- DelegateFn
@@ -275,9 +275,9 @@ EntityProvider ..> Entity : provides
 DelegateFn ..> Entity : operates on
 Executable ..> Entity : processes
 EntityPtr --|> Entity
-GoActorOption ..> Actor : configures
+Option ..> Actor : configures
 HandlerFunc ..> Executable : handles
-GoActorContext --> BehaviorStack : delegates to
+ActorContext --> BehaviorStack : delegates to
 
 ' Ask uses Ref
 Ref ..> DelegateFn : Ask wraps into command

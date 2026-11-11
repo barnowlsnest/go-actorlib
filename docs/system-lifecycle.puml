@@ -21,7 +21,7 @@ user -> sys : sys.Spawn(ctx, "worker-1", provider, timeout, opts...)
 activate sys
 
 sys -> factory : actor.New(WithProvider, WithName("worker-1"), opts...)
-factory --> sys : goActor
+factory --> sys : a
 
 sys -> actor : Start(ctx)
 activate actor
@@ -30,7 +30,7 @@ actor --> sys : nil
 sys -> actor : WaitReady(ctx, timeout)
 actor --> sys : nil (ready)
 
-sys -> ref : actorref.New(goActor)
+sys -> ref : actorref.New(a)
 ref --> sys : ref
 
 sys -> sys : Register("worker-1", ref)

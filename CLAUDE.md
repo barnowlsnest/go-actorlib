@@ -45,7 +45,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - **`EntityProvider[T]`** — `Provide() *T`; required at construction (`ErrActorNilProvider`).
 - **`Hooks`** — BeforeStart, AfterStart, BeforeStop, AfterStop, OnError. Default is `noopHooks`.
 - **`BehaviorStack[T]`** — Stack of `HandlerFunc[T]`. `Become` (push), `BecomeReplace` (swap top), `Unbecome` (pop; cannot pop the base handler). Goroutine-local; no synchronization.
-- **`GoActorContext[T]`** — Injected into the message `context.Context` at start. `GetGoActorContext[T](ctx)` returns nil outside a handler. Valid only for the current message. Exposes `Become`, `BecomeReplace`, `Unbecome`, `Name`.
+- **`ActorContext[T]`** — Injected into the message `context.Context` at start. `GetActorContext[T](ctx)` returns nil outside a handler. Valid only for the current message. Exposes `Become`, `BecomeReplace`, `Unbecome`, `Name`.
 - **`StartNew[T]`** — `New` + `Start` + `WaitReady`.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
@@ -151,7 +151,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 4. Or spawn: `ref, err := sys.Spawn(ctx, "name", provider, timeout, opts...)`.
 5. Send: `ref.Send(ctx, command.New(delegateFn))` or `sys.Send` / `ref.Ask` / `sys.Ask`.
 6. Get results: `<-cmd.Done()`, then `cmd.Error()`.
-7. Dynamic behavior: `actor.GetGoActorContext[T](ctx).Become(newHandler)`.
+7. Dynamic behavior: `actor.GetActorContext[T](ctx).Become(newHandler)`.
 8. Shutdown: `ref.Stop(timeout)` or `sys.StopAll(timeout)` or `signal.AwaitShutdown(ctx, sys, timeout)`.
 
 ## Code Conventions

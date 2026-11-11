@@ -21,7 +21,7 @@ High-level view of all ten packages and their relationships:
 Detailed class diagram showing:
 - All interfaces and their implementations
 - Generic type relationships (`Entity`, `Executable<T>`, `Ref<T>`)
-- BehaviorStack, GoActorContext, and middleware types
+- BehaviorStack, ActorContext, and middleware types
 - System, Supervisor, and their interfaces (ManagedActor, ChildSpec, ChildRef)
 - Dead letter queue, priority mailbox, and ask convenience
 - Composition, inheritance, and dependency relationships
@@ -66,7 +66,7 @@ Sequence diagram of supervisor lifecycle management:
 ### 7. [Behavior Change](./behavior-change.puml)
 Sequence diagram of dynamic behavior switching:
 - BehaviorStack operations: Become (push), BecomeReplace (swap), Unbecome (pop)
-- GoActorContext access via GetGoActorContext from context.Context
+- ActorContext access via GetActorContext from context.Context
 - Stack depth tracking and base handler protection
 - Step-by-step example of behavior transitions during message processing
 
@@ -115,7 +115,7 @@ The diagrams illustrate key architectural principles of go-actorlib:
 ### 2. **Isolation**
 - Each actor runs in its own goroutine
 - Entity state is only accessible within the actor's goroutine
-- BehaviorStack and GoActorContext are goroutine-local (no synchronization needed)
+- BehaviorStack and ActorContext are goroutine-local (no synchronization needed)
 - No shared mutable state between actors
 
 ### 3. **Asynchronous Communication**
@@ -140,7 +140,7 @@ The diagrams illustrate key architectural principles of go-actorlib:
 ### 6. **Dynamic Behavior**
 - BehaviorStack enables actors to change message handling at runtime
 - Become/Unbecome pattern for building protocol actors and state machines
-- GoActorContext provides safe access to behavior operations during message processing
+- ActorContext provides safe access to behavior operations during message processing
 
 ### 7. **Composability**
 - Hooks provide extension points for lifecycle monitoring

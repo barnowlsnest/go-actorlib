@@ -15,7 +15,7 @@ package "pkg/actor" as actor_pkg {
   component [EntityProvider<T>] as provider
   component [Hooks] as hooks
   component [BehaviorStack<T>] as behavior
-  component [GoActorContext<T>] as actorctx
+  component [ActorContext<T>] as actorctx
   component [Middleware<T>] as mw
   interface "Entity" as entity
   interface "Executable<T>" as executable
