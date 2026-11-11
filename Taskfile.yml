@@ -37,6 +37,13 @@ tasks:
     cmds:
       - golangci-lint run --fix
 
+  docs-diagrams:
+    desc: Render docs/*.puml to PNG in assets/diagrams (requires Docker)
+    cmds:
+      - mkdir -p assets/diagrams
+      - docker run --rm -v "$PWD/docs:/data" -v "$PWD/assets/diagrams:/out" plantuml/plantuml:1.2024.7 -tpng -o /out '/data/*.puml'
+      - mv -f assets/diagrams/go-actorlib-architecture.png assets/diagrams/architecture.png
+
   sanity:
     desc: Run all checks (fmt, build, test, vet)
     deps:

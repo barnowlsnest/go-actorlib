@@ -5,6 +5,7 @@ This directory contains PlantUML diagrams that visualize the architecture and be
 ## Diagrams
 
 ### 1. [Architecture Overview](./architecture.puml)
+Rendered: [PNG](../assets/diagrams/architecture.png)
 High-level view of all ten packages and their relationships:
 - `pkg/actor` — Core actor with middleware, behavior stack, actor context
 - `pkg/actorref` — Typed actor handle (Ref)
@@ -18,6 +19,7 @@ High-level view of all ten packages and their relationships:
 - `pkg/mailbox` — Priority mailbox with configurable priority levels
 
 ### 2. [Component Relationships](./component-relationships.puml)
+Rendered: [PNG](../assets/diagrams/component-relationships.png)
 Detailed class diagram showing:
 - All interfaces and their implementations
 - Generic type relationships (`Entity`, `Executable<T>`, `Ref<T>`)
@@ -27,6 +29,7 @@ Detailed class diagram showing:
 - Composition, inheritance, and dependency relationships
 
 ### 3. [Actor Lifecycle](./actor-lifecycle.puml)
+Rendered: [PNG](../assets/diagrams/actor-lifecycle.png)
 State machine diagram illustrating:
 - Actor states: Initialized → Started → Stopping → Done/Error/Cancelled/Panicked
 - CAS-based Stop() with atomic.CompareAndSwapUint64
@@ -38,6 +41,7 @@ State machine diagram illustrating:
 - Hooks and middleware integration points
 
 ### 4. [Command Flow](./command-flow.puml)
+Rendered: [PNG](../assets/diagrams/command-flow.png)
 Sequence diagram showing:
 - Command creation and execution lifecycle
 - Type-safe interaction between commands and entities
@@ -46,6 +50,7 @@ Sequence diagram showing:
 - Executes at most once; `Cancel` path for commands dropped by a terminating actor
 
 ### 5. [Message Passing](./message-passing.puml)
+Rendered: [PNG](../assets/diagrams/message-passing.png)
 Detailed sequence diagram of the Actor Model message passing pattern:
 - Ref as the entry point for all message sends
 - Middleware chain processing before behavior handler
@@ -55,6 +60,7 @@ Detailed sequence diagram of the Actor Model message passing pattern:
 - Ask pattern as simplified request/response via `ref.Ask`
 
 ### 6. [Supervision](./supervision.puml)
+Rendered: [PNG](../assets/diagrams/supervision.png)
 Sequence diagram of supervisor lifecycle management:
 - OneForOne strategy: only failed child restarts
 - AllForOne strategy: all children restart on any failure
@@ -64,6 +70,7 @@ Sequence diagram of supervisor lifecycle management:
 - LIFO shutdown ordering
 
 ### 7. [Behavior Change](./behavior-change.puml)
+Rendered: [PNG](../assets/diagrams/behavior-change.png)
 Sequence diagram of dynamic behavior switching:
 - BehaviorStack operations: Become (push), BecomeReplace (swap), Unbecome (pop)
 - ActorContext access via GetActorContext from context.Context
@@ -71,6 +78,7 @@ Sequence diagram of dynamic behavior switching:
 - Step-by-step example of behavior transitions during message processing
 
 ### 8. [System Lifecycle](./system-lifecycle.puml)
+Rendered: [PNG](../assets/diagrams/system-lifecycle.png)
 Sequence diagram of actor system operations:
 - Spawn convenience: New → Start → WaitReady → Ref → Register in one call
 - Event bus: EventActorStarted, EventActorStopped, EventSystemStopping
@@ -91,7 +99,10 @@ Sequence diagram of actor system operations:
 # macOS with Homebrew
 brew install plantuml
 
-# Generate PNG images
+# Render PNGs into assets/diagrams (Docker, used by the README)
+task docs-diagrams
+
+# Or with a local PlantUML install
 plantuml docs/*.puml
 
 # Generate SVG images

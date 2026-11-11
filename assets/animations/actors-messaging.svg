@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="330" viewBox="0 0 860 330" role="img" aria-label="Animation: Player, World and Monster actors exchanging messages through their mailboxes">
+<title>Animation: Player, World and Monster actors exchanging messages through their mailboxes</title>
+
+<style>
+  :root{--bg:#ffffff;--panel:#f6f8fa;--border:#d0d7de;--fg:#1f2328;--muted:#59636e;
+        --accent:#0969da;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;
+        --c1:#0969da;--c2:#8250df;--c3:#bf3989;--c4:#1a7f37;}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--muted:#9198a1;
+          --accent:#4493f8;--ok:#3fb950;--bad:#f85149;--warn:#d29922;
+          --c1:#4493f8;--c2:#a371f7;--c3:#db61a2;--c4:#3fb950;}
+  }
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .bg{fill:var(--bg);stroke:var(--border)}
+  .panel{fill:var(--panel);stroke:var(--border);stroke-width:1.5}
+  .muted{fill:var(--muted)}
+  .title{font-size:16px;font-weight:600}
+  .small{font-size:12px}
+  .tiny{font-size:11px}
+  .slot{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 3}
+  .edge{fill:none;stroke:var(--border);stroke-width:1.5}
+  .chiptext{font-size:12px;font-weight:600;fill:#ffffff}
+  .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .accent{fill:var(--accent)}
+  .okS{stroke:var(--ok)} .badS{stroke:var(--bad)} .accentS{stroke:var(--accent)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="859" height="329" rx="12"/>
+<text class="title" x="24" y="34">Every entity is an actor</text>
+<text class="small muted" x="24" y="54">Its own goroutine, its own mailbox, private state. Entities interact only by sending messages.</text>
+<rect class="panel" x="330" y="78" width="200" height="92" rx="10"/>
+<text class="title mono" x="344" y="102">Actor[World]</text>
+<text class="small muted" x="344" y="124">players: 1, monsters: 1</text>
+<text class="tiny muted" x="344" y="154">mailbox</text>
+<rect class="slot" x="400" y="142" width="20" height="16" rx="3"/>
+<rect class="slot" x="426" y="142" width="20" height="16" rx="3"/>
+<rect class="slot" x="452" y="142" width="20" height="16" rx="3"/>
+<rect class="slot" x="478" y="142" width="20" height="16" rx="3"/>
+<rect class="panel" x="60" y="210" width="200" height="92" rx="10"/>
+<text class="title mono" x="74" y="234">Actor[Player]</text>
+<text class="tiny muted" x="74" y="286">mailbox</text>
+<rect class="slot" x="130" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="156" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="182" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="208" y="274" width="20" height="16" rx="3"/>
+<rect class="panel" x="600" y="210" width="200" height="92" rx="10"/>
+<text class="title mono" x="614" y="234">Actor[Monster]</text>
+<text class="tiny muted" x="614" y="286">mailbox</text>
+<rect class="slot" x="670" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="696" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="722" y="274" width="20" height="16" rx="3"/>
+<rect class="slot" x="748" y="274" width="20" height="16" rx="3"/>
+<text class="small muted" x="74" y="256">hp: <tspan class="mono">100</tspan><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="1;1;0;0;1" keyTimes="0.0000;0.6488;0.6500;0.9988;1.0000"/></text><text class="small" x="74" y="256" opacity="0">hp: <tspan class="mono bad">88</tspan><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6488;0.6500;0.9625;0.9637;1.0000"/></text>
+<text class="small muted" x="614" y="256">hp: <tspan class="mono">50</tspan><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="1;1;0;0;1" keyTimes="0.0000;0.8738;0.8750;0.9988;1.0000"/></text><text class="small" x="614" y="256" opacity="0">hp: <tspan class="mono bad">20</tspan><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.8738;0.8750;0.9625;0.9637;1.0000"/></text>
+<path class="edge" d="M200 210 C 220 150, 270 125, 330 125" stroke-dasharray="3 4"/>
+<g opacity="0"><rect x="-32.0" y="-13.0" width="64" height="26" rx="6" style="fill:var(--c1)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">Move</text><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.0488;0.0500;0.2000;0.2250;1.0000"/><animateMotion dur="8.0s" repeatCount="indefinite" path="M200 210 C 220 150, 270 125, 330 125" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.0500;0.2000;1"/></g>
+<rect x="400" y="142" width="20" height="16" rx="3" style="fill:var(--c1)" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.1988;0.2000;0.2625;0.2750;1.0000"/></rect>
+<rect x="330" y="78" width="200" height="92" rx="10" fill="none" class="accentS" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;0;0" keyTimes="0.0000;0.1988;0.2000;0.2750;1.0000"/></rect>
+<path class="edge" d="M530 125 C 590 125, 650 150, 680 210" stroke-dasharray="3 4"/>
+<g opacity="0"><rect x="-32.0" y="-13.0" width="64" height="26" rx="6" style="fill:var(--c2)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">Moved</text><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.2487;0.2500;0.4000;0.4250;1.0000"/><animateMotion dur="8.0s" repeatCount="indefinite" path="M530 125 C 590 125, 650 150, 680 210" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.2500;0.4000;1"/></g>
+<rect x="670" y="274" width="20" height="16" rx="3" style="fill:var(--c2)" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.3988;0.4000;0.4625;0.4750;1.0000"/></rect>
+<rect x="600" y="210" width="200" height="92" rx="10" fill="none" class="accentS" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;0;0" keyTimes="0.0000;0.3988;0.4000;0.4750;1.0000"/></rect>
+<path class="edge" d="M600 270 C 480 300, 380 300, 260 270" stroke-dasharray="3 4"/>
+<g opacity="0"><rect x="-32.0" y="-13.0" width="64" height="26" rx="6" style="fill:var(--c3)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">Attack</text><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.4488;0.4500;0.6250;0.6500;1.0000"/><animateMotion dur="8.0s" repeatCount="indefinite" path="M600 270 C 480 300, 380 300, 260 270" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.4500;0.6250;1"/></g>
+<rect x="130" y="274" width="20" height="16" rx="3" style="fill:var(--c3)" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6238;0.6250;0.6875;0.7000;1.0000"/></rect>
+<rect x="60" y="210" width="200" height="92" rx="10" fill="none" class="accentS" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;0;0" keyTimes="0.0000;0.6238;0.6250;0.7000;1.0000"/></rect>
+<path class="edge" d="M260 240 C 380 215, 480 215, 600 240" stroke-dasharray="3 4"/>
+<g opacity="0"><rect x="-32.0" y="-13.0" width="64" height="26" rx="6" style="fill:var(--c4)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">Hit</text><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6738;0.6750;0.8500;0.8750;1.0000"/><animateMotion dur="8.0s" repeatCount="indefinite" path="M260 240 C 380 215, 480 215, 600 240" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.6750;0.8500;1"/></g>
+<rect x="670" y="274" width="20" height="16" rx="3" style="fill:var(--c4)" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.8488;0.8500;0.9125;0.9250;1.0000"/></rect>
+<rect x="600" y="210" width="200" height="92" rx="10" fill="none" class="accentS" stroke-width="2.5" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;0;0" keyTimes="0.0000;0.8488;0.8500;0.9250;1.0000"/></rect>
+</svg>

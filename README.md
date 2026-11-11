@@ -8,6 +8,25 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 [![Lint](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![Player, World and Monster actors exchanging messages through their mailboxes](assets/animations/actors-messaging.svg)
+
+## How it works
+
+Each entity (a player, a session, a device) lives inside an **actor**: one goroutine that owns the entity and a bounded mailbox that feeds it commands. Other code never touches the entity directly. It sends commands through a typed `Ref`, and the actor runs them one at a time.
+
+![Goroutines send commands into a bounded mailbox; the actor executes them one at a time](assets/animations/mailbox.svg)
+
+Around that core, `system` gives actors names, `supervision` restarts the ones that fail, and `signal` shuts everything down in order on SIGTERM / SIGINT.
+
+<details>
+<summary>Architecture overview (all packages)</summary>
+
+![go-actorlib architecture overview](assets/diagrams/architecture.png)
+
+</details>
+
+More diagrams: [`docs/`](docs/README.md).
+
 ## Features
 
 - **Type-safe** — generics bind entities, commands, and refs at compile time
@@ -40,9 +59,13 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 
 ### Cons
 
-- **Overhead for trivial concurrency.** A `sync.Mutex` or a bare channel is lighter for a counter or a simple fan-out.
+- **Ask cycles block.** If actor A `Ask`s B while B `Ask`s A, both handlers wait until the ask timeout (`ErrAskTimeout`). Use `Send` in at least one direction.
 - **Latency from message passing.** Every interaction is a channel send plus sequential processing. Hot shared reads are faster with `sync.RWMutex` or `sync/atomic`.
 - **Debugging indirection.** Stack traces stop at channel operations. Cross-actor requests need correlation IDs or structured logs.
+- **Single process.** Actors talk over in-process channels. There is no remoting or clustering.
+- **Dead letters are opt-in.** Failed sends are returned to the caller; nothing is published to the dead-letter queue automatically.
+
+![When go-actorlib is a good fit and when it is not](assets/illustrations/fit.svg)
 
 ### When to use
 
@@ -55,6 +78,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 
 - Request-scoped concurrency — `sync.WaitGroup` or `errgroup` is enough
 - Read-heavy, write-rare shared state — `sync.RWMutex` or `atomic.Value`
+- Trivial shared state such as a single counter — `sync.Mutex` or `sync/atomic`
 - Fire-and-forget work — a goroutine and a channel
 - CPU-bound pipelines — worker pools and fan-out / fan-in
 
@@ -125,6 +149,8 @@ Defaults: input buffer size `16`, receive timeout `5s`. A receive timeout of `0`
 
 ### Commands
 
+![Command flow: Send, execute, result on Done()](assets/diagrams/command-flow.png)
+
 ```go
 import "github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 
@@ -179,6 +205,8 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 
 ### Lifecycle rules and errors
 
+![Actor lifecycle state machine](assets/diagrams/actor-lifecycle.png)
+
 - **Start once.** `Start` succeeds at most once; concurrent or repeated calls return `ErrActorAlreadyStarted`. A `Start` that fails validation (`ErrActorNilEntity`) may be retried.
 - **Panics are terminal.** A panic recovered from a handler or the `AfterStart` hook moves the actor to `Panicked` and ends its goroutine; `Done()` closes. Use the `Recovery` middleware to keep the actor alive instead.
 - **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `Command` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
@@ -222,6 +250,8 @@ Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
 ### Supervision
 
+![A supervisor restarts a child actor after it panics](assets/animations/supervision.svg)
+
 Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Failures (`Panicked`, `StoppedWithError`, `Canceled`) are restarted; clean `Done` stops are not. Stopping a child that already terminated is not reported as an error by `StopAll` or `OnRestartError`; a child that someone else is still stopping is waited on (up to the stop timeout) before it is restarted.
 
 ```go
@@ -262,6 +292,13 @@ func (s *MyChildSpec) Start(ctx context.Context) (supervision.ChildRef, error) {
 }
 ```
 
+<details>
+<summary>Supervision sequence diagram</summary>
+
+![Supervision sequence diagram](assets/diagrams/supervision.png)
+
+</details>
+
 ### Behavior change
 
 ```go
@@ -301,6 +338,10 @@ myActor, err := actor.StartNew(ctx, 5*time.Second,
 
 The queue is opt-in: publish undeliverable messages yourself (for example from a send-error path). Default capacity is 1000; the oldest letter is dropped when full. A capacity of `0` or less retains nothing but still notifies handlers.
 
+A full mailbox is backpressure, not a failure: `Send` waits up to the receive timeout, then returns `ErrActorReceiveTimeout`. That send-error path is where a dead letter belongs.
+
+![A full mailbox blocks the sender until the receive timeout expires](assets/animations/backpressure.svg)
+
 ```go
 dlq := deadletter.New(deadletter.WithCapacity(1000))
 
@@ -309,6 +350,10 @@ dlq.OnDeadLetter(func(l deadletter.Letter) {
 })
 
 dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: "actor stopped"})
+
+if err := ref.Send(ctx, cmd); errors.Is(err, actor.ErrActorReceiveTimeout) {
+    dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: err.Error()})
+}
 ```
 
 ### OS signals
@@ -381,7 +426,7 @@ Please do not commit generated coverage files or editor config (see `.gitignore`
 
 ## License
 
-[MIT](LICENSE) © 2025 Barn Owls Nest
+[MIT](LICENSE) © 2026 Barn Owls Nest
 
 ## References
 
