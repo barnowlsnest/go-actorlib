@@ -1,7 +1,7 @@
 package actor
 
 // BehaviorStack manages a stack of handler functions for dynamic behavior changes.
-// It is used internally by GoActor to implement Become/Unbecome semantics.
+// It is used internally by Actor to implement Become/Unbecome semantics.
 // Only accessed from within the actor's goroutine, so no synchronization is needed.
 type BehaviorStack[T Entity] struct {
 	stack []HandlerFunc[T]

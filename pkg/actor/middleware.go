@@ -28,7 +28,7 @@ func Chain[T Entity](middlewares ...Middleware[T]) Middleware[T] {
 // Multiple calls to WithMiddleware append to the existing middleware slice.
 // Middleware is composed once at Start() time, so there is no per-message overhead.
 func WithMiddleware[T Entity](middlewares ...Middleware[T]) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.middleware = append(actor.middleware, middlewares...)
 		return actor
 	}
@@ -37,15 +37,15 @@ func WithMiddleware[T Entity](middlewares ...Middleware[T]) GoActorOption[T] {
 // buildHandler composes the middleware chain into a single handler function.
 // When no middleware is configured, the handler calls Execute directly (zero overhead).
 // This method is called once during Start().
-func (ga *GoActor[T]) buildHandler() {
+func (a *Actor[T]) buildHandler() {
 	base := func(ctx context.Context, executable Executable[T], entity T) {
 		executable.Execute(ctx, entity)
 	}
 
-	if len(ga.middleware) == 0 {
-		ga.handler = base
+	if len(a.middleware) == 0 {
+		a.handler = base
 		return
 	}
 
-	ga.handler = Chain[T](ga.middleware...)(base)
+	a.handler = Chain[T](a.middleware...)(base)
 }

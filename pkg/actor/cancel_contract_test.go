@@ -34,7 +34,7 @@ func (c *funcCancelCommand) Cancel(err error) {
 // returns the release channel.
 func startBlocked(
 	t *testing.T, ctx context.Context, opts ...GoActorOption[*TestEntity],
-) (a *GoActor[*TestEntity], release chan struct{}) {
+) (a *Actor[*TestEntity], release chan struct{}) {
 	t.Helper()
 	all := append([]GoActorOption[*TestEntity]{
 		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),

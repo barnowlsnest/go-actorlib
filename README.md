@@ -19,7 +19,7 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 - **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
 - **Middleware** — logging, metrics, and panic recovery (`go-logslib`)
 - **Dead letters** — queue for undeliverable messages with handlers
-- **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `GoActor`)
+- **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `Actor`)
 - **Signals** — SIGTERM / SIGINT graceful shutdown
 - **Panic recovery** — panics become errors; a panicked actor terminates cleanly (`Done()` closes) so supervisors can restart it
 - **Dropped commands are canceled** — `GoCommand`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
@@ -325,7 +325,7 @@ sys.StopAll(10 * time.Second)
 
 ### Priority mailbox
 
-Standalone heap — not plugged into `GoActor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
+Standalone heap — not plugged into `Actor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
 
 ```go
 mb := mailbox.NewPriority[*MyEntity](100)
@@ -341,7 +341,7 @@ msg, ok := mb.Pop() // systemCmd
 
 | Package | Description |
 |---|---|
-| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actor) | `GoActor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
+| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
 | [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actorref) | Typed `Ref`: `Send`, `Stop`, `State`, `Done` |
 | [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/command) | `GoCommand` with `DelegateFn` and a result channel |
 | [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/ask) | Request/response with timeout |

@@ -8,7 +8,7 @@
 //   - Support graceful lifecycle management
 //
 // The core components are:
-//   - GoActor[T]: The main actor implementation that processes Executable commands
+//   - Actor[T]: The main actor implementation that processes Executable commands
 //   - Entity: Interface for actor-managed data structures
 //   - Executable[T]: Interface for commands that can be executed by actors
 //   - Hooks: Lifecycle event handlers for monitoring and extending actor behavior
@@ -155,9 +155,9 @@ type (
 		Provide() T
 	}
 
-	// GoActor is a generic actor implementation that processes commands asynchronously.
+	// Actor is a generic actor implementation that processes commands asynchronously.
 	//
-	// GoActor manages an entity of type T and processes Executable[T] commands
+	// Actor manages an entity of type T and processes Executable[T] commands
 	// in a dedicated goroutine. It provides thread-safe state management,
 	// configurable timeouts, and lifecycle hooks for monitoring.
 	//
@@ -167,7 +167,7 @@ type (
 	//   - Asynchronous communication through message passing
 	//   - Supervision and error handling through hooks
 	//   - Dynamic behavior change via Become/Unbecome
-	GoActor[T Entity] struct {
+	Actor[T Entity] struct {
 		receiveTimeout time.Duration
 		inputBufSize   int
 		state          uint64
@@ -199,10 +199,10 @@ type (
 	//
 	// Options follow the functional options pattern, allowing flexible
 	// and extensible actor configuration.
-	GoActorOption[T Entity] func(*GoActor[T]) *GoActor[T]
+	GoActorOption[T Entity] func(*Actor[T]) *Actor[T]
 )
 
-// New creates a new GoActor with the specified options.
+// New creates a new Actor with the specified options.
 //
 // The actor is created in the Initialized state and must be started
 // using the Start method before it can process messages.
@@ -211,8 +211,8 @@ type (
 // If no hooks are provided, a no-op implementation is used.
 //
 // Returns an error if the provider is nil or if any configuration is invalid.
-func New[T Entity](opts ...GoActorOption[T]) (*GoActor[T], error) {
-	actor := &GoActor[T]{
+func New[T Entity](opts ...GoActorOption[T]) (*Actor[T], error) {
+	actor := &Actor[T]{
 		inputBufSize:   1,               // default input buffer size
 		receiveTimeout: 5 * time.Second, // default receive timeout
 	}
@@ -244,8 +244,8 @@ func New[T Entity](opts ...GoActorOption[T]) (*GoActor[T], error) {
 // This method is thread-safe and can be called from any goroutine.
 // The returned value corresponds to one of the state constants
 // (Initialized, Started, Stopping, etc.).
-func (ga *GoActor[T]) State() uint64 {
-	return atomic.LoadUint64(&ga.state)
+func (a *Actor[T]) State() uint64 {
+	return atomic.LoadUint64(&a.state)
 }
 
 // CheckState verifies that the actor is in the expected state.
@@ -253,8 +253,8 @@ func (ga *GoActor[T]) State() uint64 {
 // Returns an error if the actor's current state does not match
 // the expected state. This is useful for ensuring state preconditions
 // before performing operations.
-func (ga *GoActor[T]) CheckState(state uint64) error {
-	current := atomic.LoadUint64(&ga.state)
+func (a *Actor[T]) CheckState(state uint64) error {
+	current := atomic.LoadUint64(&a.state)
 	if current != state {
 		return fmt.Errorf("actor state mismatch: expected %d, got %d", state, current)
 	}
@@ -265,8 +265,8 @@ func (ga *GoActor[T]) CheckState(state uint64) error {
 //
 // This represents the maximum number of messages that can be queued
 // for processing before senders will block or timeout.
-func (ga *GoActor[T]) InputBufferSize() int {
-	return ga.inputBufSize
+func (a *Actor[T]) InputBufferSize() int {
+	return a.inputBufSize
 }
 
 // WaitReady blocks until the actor is ready to process messages or times out.
@@ -276,12 +276,12 @@ func (ga *GoActor[T]) InputBufferSize() int {
 //
 // Returns an error if the context is canceled, the timeout is exceeded,
 // or the actor fails to start properly.
-func (ga *GoActor[T]) WaitReady(ctx context.Context, timeout time.Duration) error {
+func (a *Actor[T]) WaitReady(ctx context.Context, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	select {
-	case <-ga.ready:
+	case <-a.ready:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -290,28 +290,28 @@ func (ga *GoActor[T]) WaitReady(ctx context.Context, timeout time.Duration) erro
 	}
 }
 
-func (ga *GoActor[T]) processExecutable(ctx context.Context, e Executable[T]) error {
+func (a *Actor[T]) processExecutable(ctx context.Context, e Executable[T]) error {
 	select {
-	case ga.input <- e:
+	case a.input <- e:
 		return nil
-	case <-ga.stop:
+	case <-a.stop:
 		return ErrActorReceiveOnStopped
-	case <-ga.exiting:
+	case <-a.exiting:
 		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (ga *GoActor[T]) processExecutableWithTimeout(ctx context.Context, e Executable[T], t time.Duration) error {
+func (a *Actor[T]) processExecutableWithTimeout(ctx context.Context, e Executable[T], t time.Duration) error {
 	timer := time.NewTimer(t)
 	defer timer.Stop()
 	select {
-	case ga.input <- e:
+	case a.input <- e:
 		return nil
-	case <-ga.stop:
+	case <-a.stop:
 		return ErrActorReceiveOnStopped
-	case <-ga.exiting:
+	case <-a.exiting:
 		return ErrActorReceiveOnStopped
 	case <-ctx.Done():
 		return ctx.Err()
@@ -320,21 +320,21 @@ func (ga *GoActor[T]) processExecutableWithTimeout(ctx context.Context, e Execut
 	}
 }
 
-func (ga *GoActor[T]) handleCtxErr(err error) {
+func (a *Actor[T]) handleCtxErr(err error) {
 	if err == nil {
 		return
 	}
 
 	switch {
 	case errors.Is(err, context.Canceled):
-		atomic.StoreUint64(&ga.state, Canceled)
-		ga.hooks.OnError(ErrActorContextCanceled)
+		atomic.StoreUint64(&a.state, Canceled)
+		a.hooks.OnError(ErrActorContextCanceled)
 	case errors.Is(err, context.DeadlineExceeded):
-		atomic.StoreUint64(&ga.state, StoppedWithError)
-		ga.hooks.OnError(ErrActorContextDeadlineExceeded)
+		atomic.StoreUint64(&a.state, StoppedWithError)
+		a.hooks.OnError(ErrActorContextDeadlineExceeded)
 	default:
-		atomic.StoreUint64(&ga.state, StoppedWithError)
-		ga.hooks.OnError(err)
+		atomic.StoreUint64(&a.state, StoppedWithError)
+		a.hooks.OnError(err)
 	}
 }
 
@@ -350,12 +350,12 @@ func (ga *GoActor[T]) handleCtxErr(err error) {
 //   - The actor has left Started ([ErrActorReceiveOnStopped])
 //   - The context is canceled
 //   - The receive timeout is exceeded ([ErrActorReceiveTimeout])
-func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
+func (a *Actor[T]) Receive(ctx context.Context, e Executable[T]) error {
 	if e == nil {
 		return ErrActorReceiveNil
 	}
 
-	switch atomic.LoadUint64(&ga.state) {
+	switch atomic.LoadUint64(&a.state) {
 	case Started:
 		// ok
 	case Initialized:
@@ -364,20 +364,20 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 		return ErrActorReceiveOnStopped
 	}
 
-	ga.sendMu.RLock()
-	defer ga.sendMu.RUnlock()
+	a.sendMu.RLock()
+	defer a.sendMu.RUnlock()
 
-	if ga.closed {
+	if a.closed {
 		return ErrActorReceiveOnStopped
 	}
 
-	t := ga.receiveTimeout
+	t := a.receiveTimeout
 
 	if t == 0 {
-		return ga.processExecutable(ctx, e)
+		return a.processExecutable(ctx, e)
 	}
 
-	return ga.processExecutableWithTimeout(ctx, e, t)
+	return a.processExecutableWithTimeout(ctx, e, t)
 }
 
 // Start begins the actor's message processing loop in a new goroutine.
@@ -396,94 +396,94 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 // non-providable entity) may be retried.
 //
 // Returns an error if the entity is nil, not providable, or if startup fails.
-func (ga *GoActor[T]) Start(ctx context.Context) error {
+func (a *Actor[T]) Start(ctx context.Context) error {
 	// Claim the one-shot start slot: state stays Initialized until the loop
 	// goroutine runs, so the state alone cannot guard concurrent Start calls.
-	if atomic.LoadUint64(&ga.state) != Initialized || !ga.starting.CompareAndSwap(false, true) {
+	if atomic.LoadUint64(&a.state) != Initialized || !a.starting.CompareAndSwap(false, true) {
 		return ErrActorAlreadyStarted
 	}
 
-	entity := ga.provider.Provide()
+	entity := a.provider.Provide()
 
 	// Check if the entity is nil using reflection
 	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
 	rv := reflect.ValueOf(entity)
 	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
-		ga.starting.Store(false) // allow a retry after a failed Start
+		a.starting.Store(false) // allow a retry after a failed Start
 		return ErrActorNilEntity
 	}
 
 	if !entity.IsProvidable() {
-		ga.starting.Store(false) // allow a retry after a failed Start
+		a.starting.Store(false) // allow a retry after a failed Start
 		return ErrActorNilEntity
 	}
 
-	ga.buildHandler()
-	ga.behavior = newBehaviorStack(ga.handler)
-	ga.actorCtx = &GoActorContext[T]{
-		behavior: ga.behavior,
-		name:     ga.name,
+	a.buildHandler()
+	a.behavior = newBehaviorStack(a.handler)
+	a.actorCtx = &GoActorContext[T]{
+		behavior: a.behavior,
+		name:     a.name,
 	}
 
 	func(e T) {
-		defer ga.catchPanic()
-		ga.hooks.BeforeStart(e)
+		defer a.catchPanic()
+		a.hooks.BeforeStart(e)
 	}(entity)
 
 	go func(ctx context.Context, entity T) {
-		defer close(ga.done)
-		defer ga.drain()
+		defer close(a.done)
+		defer a.drain()
 
 		// Enrich context with actor context for handlers and middleware
-		actorScopedCtx := withGoActorContext(ctx, ga.actorCtx)
+		actorScopedCtx := withGoActorContext(ctx, a.actorCtx)
 
-		atomic.StoreUint64(&ga.state, Started)
-		close(ga.ready) // Signal that the actor is ready to receive messages
+		atomic.StoreUint64(&a.state, Started)
+		close(a.ready) // Signal that the actor is ready to receive messages
 
 		func() {
-			defer ga.catchPanic()
-			ga.hooks.AfterStart()
+			defer a.catchPanic()
+			a.hooks.AfterStart()
 		}()
 
-		if ga.panicked() {
+		if a.panicked() {
 			return
 		}
 
 		for {
 			select {
 			case <-ctx.Done():
-				ga.handleCtxErr(ctx.Err())
+				a.handleCtxErr(ctx.Err())
 				return
-			case <-ga.stop:
+			case <-a.stop:
 				func(e T) {
-					defer ga.catchPanic()
-					ga.hooks.BeforeStop(e)
+					defer a.catchPanic()
+					a.hooks.BeforeStop(e)
 				}(entity)
 				return
-			case e := <-ga.input:
+			case e := <-a.input:
 				select {
 				case <-ctx.Done():
 					// Record the terminal state first: Cancel may call back into
 					// the actor and must see it as no longer Started.
-					ga.handleCtxErr(ctx.Err())
-					ga.cancelExecutable(e)
+					a.handleCtxErr(ctx.Err())
+					a.cancelExecutable(e)
 					return
-				case <-ga.stop:
-					ga.cancelExecutable(e)
+				case <-a.stop:
+					a.cancelExecutable(e)
 					func(e T) {
-						defer ga.catchPanic()
-						ga.hooks.BeforeStop(e)
+						defer a.catchPanic()
+						a.hooks.BeforeStop(e)
 					}(entity)
 					return
 				default:
 					func() {
-						defer ga.catchPanic()
-						ga.behavior.Current()(actorScopedCtx, e, entity)
+						defer a.catchPanic()
+						a.behavior.Current()(actorScopedCtx, e, entity)
 					}()
 
 					// A recovered panic is terminal: exit so Done closes and
 					// supervisors observe the failure.
-					if ga.panicked() {
+					if a.panicked() {
 						return
 					}
 				}
@@ -505,12 +505,12 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 // Returns [ErrActorGracefulStopTimeout] if the actor does not terminate within
 // the timeout, or an error wrapping [ErrActorNotRunning] if the actor is not
 // in the Started state (never started, already stopping, or terminated).
-func (ga *GoActor[T]) Stop(timeout time.Duration) error {
-	if !atomic.CompareAndSwapUint64(&ga.state, Started, Stopping) {
-		return fmt.Errorf("%w: state %s", ErrActorNotRunning, stateName(atomic.LoadUint64(&ga.state)))
+func (a *Actor[T]) Stop(timeout time.Duration) error {
+	if !atomic.CompareAndSwapUint64(&a.state, Started, Stopping) {
+		return fmt.Errorf("%w: state %s", ErrActorNotRunning, stateName(atomic.LoadUint64(&a.state)))
 	}
 
-	close(ga.stop)
+	close(a.stop)
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -518,17 +518,17 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 	var err error
 
 	select {
-	case <-ga.done:
-		atomic.StoreUint64(&ga.state, Done)
+	case <-a.done:
+		atomic.StoreUint64(&a.state, Done)
 	case <-timer.C:
-		atomic.StoreUint64(&ga.state, StoppedWithError)
-		ga.hooks.OnError(ErrActorGracefulStopTimeout)
+		atomic.StoreUint64(&a.state, StoppedWithError)
+		a.hooks.OnError(ErrActorGracefulStopTimeout)
 		err = ErrActorGracefulStopTimeout
 	}
 
 	func() {
-		defer ga.catchPanic()
-		ga.hooks.AfterStop()
+		defer a.catchPanic()
+		a.hooks.AfterStop()
 	}()
 
 	return err
@@ -542,7 +542,7 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 // A buffer size of 0 creates an unbuffered channel, which means senders
 // will block until the actor is ready to process the message.
 func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.inputBufSize = inputBufSize
 		return actor
 	}
@@ -556,7 +556,7 @@ func WithInputBufferSize[T Entity](inputBufSize int) GoActorOption[T] {
 // If set to a positive duration, Receive will return an error if the message
 // cannot be queued within that timeframe. The default timeout is 5 seconds.
 func WithReceiveTimeout[T Entity](timeout time.Duration) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.receiveTimeout = timeout
 		return actor
 	}
@@ -570,7 +570,7 @@ func WithReceiveTimeout[T Entity](timeout time.Duration) GoActorOption[T] {
 //
 // The provider's Provide() method is called once during actor startup.
 func WithProvider[T Entity](provider EntityProvider[T]) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.provider = provider
 		return actor
 	}
@@ -579,21 +579,21 @@ func WithProvider[T Entity](provider EntityProvider[T]) GoActorOption[T] {
 // WithName configures the actor's name.
 // The name is available via GoActorContext.Name() during message processing.
 func WithName[T Entity](name string) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.name = name
 		return actor
 	}
 }
 
 // Name returns the actor's name.
-func (ga *GoActor[T]) Name() string {
-	return ga.name
+func (a *Actor[T]) Name() string {
+	return a.name
 }
 
 // Done returns a channel that is closed when the actor's goroutine exits.
 // This can be used to wait for the actor to fully terminate.
-func (ga *GoActor[T]) Done() <-chan struct{} {
-	return ga.done
+func (a *Actor[T]) Done() <-chan struct{} {
+	return a.done
 }
 
 // WithHooks configures lifecycle event handlers for the actor.
@@ -604,7 +604,7 @@ func (ga *GoActor[T]) Done() <-chan struct{} {
 // All hook methods should be non-blocking and handle errors gracefully,
 // as they run within the actor's critical execution paths.
 func WithHooks[T Entity](hooks Hooks) GoActorOption[T] {
-	return func(actor *GoActor[T]) *GoActor[T] {
+	return func(actor *Actor[T]) *Actor[T] {
 		actor.hooks = hooks
 		return actor
 	}
@@ -613,17 +613,17 @@ func WithHooks[T Entity](hooks Hooks) GoActorOption[T] {
 // drain runs on the actor goroutine when the loop exits. It wakes blocked senders,
 // waits for in-flight sends to finish, rejects further sends, and cancels every
 // command left in the mailbox.
-func (ga *GoActor[T]) drain() {
-	close(ga.exiting)
+func (a *Actor[T]) drain() {
+	close(a.exiting)
 
-	ga.sendMu.Lock()
-	ga.closed = true
-	ga.sendMu.Unlock()
+	a.sendMu.Lock()
+	a.closed = true
+	a.sendMu.Unlock()
 
 	for {
 		select {
-		case e := <-ga.input:
-			ga.cancelExecutable(e)
+		case e := <-a.input:
+			a.cancelExecutable(e)
 		default:
 			return
 		}
@@ -632,7 +632,7 @@ func (ga *GoActor[T]) drain() {
 
 // cancelExecutable notifies a dropped command if it implements Cancelable.
 // A panic in Cancel is reported via OnError without changing the actor state.
-func (ga *GoActor[T]) cancelExecutable(e Executable[T]) {
+func (a *Actor[T]) cancelExecutable(e Executable[T]) {
 	c, ok := e.(Cancelable)
 	if !ok {
 		return
@@ -640,7 +640,7 @@ func (ga *GoActor[T]) cancelExecutable(e Executable[T]) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			ga.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", r)))
+			a.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", r)))
 		}
 	}()
 
@@ -670,8 +670,8 @@ func stateName(state uint64) string {
 }
 
 // panicked reports whether a recovered panic has moved the actor to the Panicked state.
-func (ga *GoActor[T]) panicked() bool {
-	return atomic.LoadUint64(&ga.state) == Panicked
+func (a *Actor[T]) panicked() bool {
+	return atomic.LoadUint64(&a.state) == Panicked
 }
 
 // catchPanic recovers from panics that occur during hook execution or command processing.
@@ -679,14 +679,14 @@ func (ga *GoActor[T]) panicked() bool {
 // When a panic is recovered, the actor state is set to Panicked and the error
 // is reported through the OnError hook. Different panic types are handled
 // appropriately to provide meaningful error information.
-func (ga *GoActor[T]) catchPanic() {
+func (a *Actor[T]) catchPanic() {
 	if err := recover(); err != nil {
-		atomic.StoreUint64(&ga.state, Panicked)
+		atomic.StoreUint64(&a.state, Panicked)
 		switch e := err.(type) {
 		case error:
-			ga.hooks.OnError(errors.Join(ErrActorPanic, e))
+			a.hooks.OnError(errors.Join(ErrActorPanic, e))
 		default:
-			ga.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", e)))
+			a.hooks.OnError(errors.Join(ErrActorPanic, fmt.Errorf("%v", e)))
 		}
 	}
 }

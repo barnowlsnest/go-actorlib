@@ -38,7 +38,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actor` — Core actor implementation
 
-- **`GoActor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
+- **`Actor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
 - **`Entity`** — `IsProvidable() bool`.
 - **`Executable[T Entity]`** — Commands sent via `Receive()`.
 - **`EntityProvider[T]`** — `Provide() T`; required at construction (`ErrActorNilProvider`).
@@ -61,7 +61,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 ### `pkg/actorref` — Typed actor handle (proxy)
 
 - **`Ref[T Entity]`** — Immutable proxy (`actor` field unexported). `Send`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
-- **`New[T](a *GoActor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
+- **`New[T](a *Actor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
 - Safe for concurrent use; multiple refs can point to the same actor. `Send` delegates to `Receive`.
 
 ### `pkg/command` — Command pattern for async operations
@@ -75,7 +75,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/ask` — Ask pattern (request/response convenience)
 
-- **`New[E Entity, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*GoActor[E]`.
+- **`New[E Entity, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*Actor[E]`.
 - **`ErrAskTimeout`** — Result not received within timeout. Also returns `ctx.Err()` if the context is done first.
 
 ### `pkg/system` — Actor system with registry and lifecycle
@@ -127,7 +127,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/mailbox` — Alternative mailbox implementations
 
-- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `GoActor.Receive` (actor mailbox is a bounded channel).
+- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `Actor.Receive` (actor mailbox is a bounded channel).
 - Priority: `System` > `High` > `Normal` > `Low` (iota; lower value = higher priority). FIFO via insertion `seq` within the same priority.
 - **`Push`** returns false if full (`maxSize > 0`) or closed. **`Pop`**, **`Notify`** (buffered 1, non-blocking signal), **`Size`**, **`Close`**, **`IsEmpty`**.
 

@@ -63,7 +63,7 @@ type GoAskTestSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	entity *TestEntity
-	actor  *actor.GoActor[*TestEntity]
+	actor  *actor.Actor[*TestEntity]
 	ref    *actorref.Ref[*TestEntity]
 }
 

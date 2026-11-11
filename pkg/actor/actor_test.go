@@ -178,7 +178,7 @@ func (th *TestHooks) ClearCalls() {
 	th.errors = th.errors[:0]
 }
 
-// GoActorTestSuite provides a test suite for GoActor
+// GoActorTestSuite provides a test suite for Actor
 type GoActorTestSuite struct {
 	suite.Suite
 	ctx      context.Context

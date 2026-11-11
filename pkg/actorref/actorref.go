@@ -12,12 +12,12 @@ import (
 // lifecycle management methods like Start, WaitReady, and CheckState.
 // Safe for concurrent use. Immutability guaranteed by unexported fields.
 type Ref[T actor.Entity] struct {
-	actor *actor.GoActor[T]
+	actor *actor.Actor[T]
 }
 
 // New creates a Ref for the given actor.
 // Returns ErrActorRefNilActor if a is nil.
-func New[T actor.Entity](a *actor.GoActor[T]) (*Ref[T], error) {
+func New[T actor.Entity](a *actor.Actor[T]) (*Ref[T], error) {
 	if a == nil {
 		return nil, ErrActorRefNilActor
 	}

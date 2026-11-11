@@ -94,7 +94,7 @@ func TestActorRefTestSuite(t *testing.T) {
 	suite.Run(t, new(ActorRefTestSuite))
 }
 
-func (s *ActorRefTestSuite) newStartedActor() *actor.GoActor[*testEntity] {
+func (s *ActorRefTestSuite) newStartedActor() *actor.Actor[*testEntity] {
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
 		actor.WithInputBufferSize[*testEntity](10),

@@ -30,7 +30,7 @@ func (c *cancelableCommand) Cancel(err error) {
 	c.cancelErr.Store(err)
 }
 
-func startDrainActor(t *testing.T, ctx context.Context, bufSize int) *GoActor[*TestEntity] {
+func startDrainActor(t *testing.T, ctx context.Context, bufSize int) *Actor[*TestEntity] {
 	t.Helper()
 	a, err := StartNew(ctx, time.Second,
 		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
@@ -40,7 +40,7 @@ func startDrainActor(t *testing.T, ctx context.Context, bufSize int) *GoActor[*T
 	return a
 }
 
-func waitDone(t *testing.T, a *GoActor[*TestEntity]) {
+func waitDone(t *testing.T, a *Actor[*TestEntity]) {
 	t.Helper()
 	select {
 	case <-a.Done():
