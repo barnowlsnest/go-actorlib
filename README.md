@@ -65,9 +65,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 - **Latency from message passing.** Every interaction is a channel send plus sequential processing. Hot shared reads are faster with `sync.RWMutex` or `sync/atomic`.
 - **Debugging indirection.** Stack traces stop at channel operations. Cross-actor requests need correlation IDs or structured logs.
 - **Single process.** Actors talk over in-process channels. There is no remoting or clustering.
-- **Backpressure surfaces as errors.** When a mailbox is full, `Send` blocks up to the receive timeout and then returns `ErrActorReceiveTimeout`:
-
-![A full mailbox blocks the sender until the receive timeout expires](assets/animations/backpressure.svg)
+- **Dead letters are opt-in.** Failed sends are returned to the caller; nothing is published to the dead-letter queue automatically.
 
 ### When to use
 
@@ -340,6 +338,10 @@ myActor, err := actor.StartNew(ctx, 5*time.Second,
 
 The queue is opt-in: publish undeliverable messages yourself (for example from a send-error path). Default capacity is 1000; the oldest letter is dropped when full. A capacity of `0` or less retains nothing but still notifies handlers.
 
+A full mailbox is backpressure, not a failure: `Send` waits up to the receive timeout, then returns `ErrActorReceiveTimeout`. That send-error path is where a dead letter belongs.
+
+![A full mailbox blocks the sender until the receive timeout expires](assets/animations/backpressure.svg)
+
 ```go
 dlq := deadletter.New(deadletter.WithCapacity(1000))
 
@@ -348,6 +350,10 @@ dlq.OnDeadLetter(func(l deadletter.Letter) {
 })
 
 dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: "actor stopped"})
+
+if err := ref.Send(ctx, cmd); errors.Is(err, actor.ErrActorReceiveTimeout) {
+    dlq.Publish(deadletter.Letter{Target: "worker-1", Reason: err.Error()})
+}
 ```
 
 ### OS signals

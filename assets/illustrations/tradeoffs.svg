@@ -46,7 +46,7 @@
 <text class="bad" x="462" y="120" font-weight="700" font-size="14">✕</text>
 <text class="small" x="484" y="120" font-size="13">Every call is a channel hop (latency)</text>
 <text class="bad" x="462" y="152" font-weight="700" font-size="14">✕</text>
-<text class="small" x="484" y="152" font-size="13">Full mailbox: senders block, then time out</text>
+<text class="small" x="484" y="152" font-size="13">Dead letters are opt-in: you publish them</text>
 <text class="bad" x="462" y="184" font-weight="700" font-size="14">✕</text>
 <text class="small" x="484" y="184" font-size="13">In-memory state only: no built-in persistence</text>
 <text class="bad" x="462" y="216" font-weight="700" font-size="14">✕</text>
