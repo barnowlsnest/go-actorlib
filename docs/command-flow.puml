@@ -19,6 +19,7 @@ activate actor
 
 alt Actor terminates before executing cmd
   actor -> cmd : Cancel(ErrActorCommandDropped)
+  cmd -> cmd : close(channel)
   note right of cmd : State: Canceled\nDone closed without a value
 else Actor executes cmd
 actor -> cmd : Execute(ctx, entity)
@@ -46,9 +47,11 @@ alt Context not cancelled
 else Context cancelled
   note right of cmd : State: Canceled
 end
-end
 
 cmd -> cmd : close(channel)
+note right of cmd : exactly once, on every\nexecution outcome
+end
+
 deactivate cmd
 deactivate actor
 
