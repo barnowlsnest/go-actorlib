@@ -221,7 +221,7 @@ Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
 ### Supervision
 
-Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Failures (`Panicked`, `StoppedWithError`, `Canceled`) are restarted; clean `Done` stops are not. Stopping a child that already terminated is not reported as an error by `StopAll` or `OnRestartError`.
+Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Failures (`Panicked`, `StoppedWithError`, `Canceled`) are restarted; clean `Done` stops are not. Stopping a child that already terminated is not reported as an error by `StopAll` or `OnRestartError`; a child that someone else is still stopping is waited on (up to the stop timeout) before it is restarted.
 
 ```go
 sup := supervision.NewSupervisor(

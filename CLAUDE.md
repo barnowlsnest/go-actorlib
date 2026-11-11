@@ -97,7 +97,7 @@ Ten packages under `pkg/`.
 - Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
-- **`stopChild`** — used by `StopAll` and AllForOne; treats `actor.ErrActorNotRunning` (child already dead) as success.
+- **`stopChild`** — used by `StopAll` and AllForOne. On `actor.ErrActorNotRunning` it waits for `Done()` (bounded by the timeout) before reporting success, because that error also covers a child another caller is still stopping; restarting earlier would overlap two instances.
 - **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
