@@ -18,12 +18,13 @@ func TestStop_WhenTimeoutElapses_ShouldReturnGracefulStopTimeout(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	release := make(chan struct{})
+	started, release := make(chan struct{}), make(chan struct{})
 	defer close(release)
 	require.NoError(t, a.Receive(context.Background(), NewTestCommand("slow", func(context.Context, *TestEntity) {
+		close(started)
 		<-release
 	})))
-	time.Sleep(10 * time.Millisecond)
+	<-started // the handler is running, so Stop must wait for it
 
 	// Act
 	err = a.Stop(time.Millisecond)
