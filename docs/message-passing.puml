@@ -37,9 +37,9 @@ else Buffer Full & Timeout
   ref --> sender : error
   deactivate ref
   deactivate sender
-else Stop Channel Closed
+else Stop Channel Closed / Actor Exiting
   stopchan --> ref : actor stopping
-  ref --> sender : ErrActorReceiveTimeout
+  ref --> sender : ErrActorReceiveOnStopped
   deactivate ref
   deactivate sender
 end
@@ -66,14 +66,16 @@ loop Processing Loop
       deactivate entity
     else Panic
       middleware -> middleware : Recovery catches panic
-      note right : Prevents Panicked state\nif Recovery middleware active
+      note right : Prevents Panicked state\nif Recovery middleware active.\nOtherwise: Panicked, loop exits
     end
 
     deactivate behavior
     deactivate middleware
 
-  else Stop Signal
-    actor -> actor : transition to Done
+  else Stop Signal / ctx done / panic
+    actor -> actor : drain mailbox
+    note right : close(exiting); reject new sends;\nCancel(ErrActorCommandDropped)\non queued Cancelable commands
+    actor -> actor : transition to terminal state
     note right : close(done channel)
   end
 end

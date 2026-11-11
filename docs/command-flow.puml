@@ -17,8 +17,12 @@ note right : State: Created
 client -> actor : Receive(ctx, cmd)
 activate actor
 
+alt Actor terminates before executing cmd
+  actor -> cmd : Cancel(ErrActorCommandDropped)
+  note right of cmd : State: Canceled\nDone closed without a value
+else Actor executes cmd
 actor -> cmd : Execute(ctx, entity)
-note right of cmd : State: Started
+note right of cmd : State: Started\n(no-op if already run or canceled)
 
 alt Context not cancelled
   cmd -> entity : delegateFn(entity)
@@ -27,16 +31,21 @@ alt Context not cancelled
   alt Success
     entity --> cmd : result, nil
     deactivate entity
+    note right of cmd : State: Finished\n(recorded before the send)
     cmd -> channel : result
-    note right of cmd : State: Finished
   else Error
     entity --> cmd : zero, error
     deactivate entity
     note right of cmd : State: Failed
+  else Panic
+    entity --> cmd : recovered
+    deactivate entity
+    note right of cmd : State: Panic\nError = ErrCommandPanic + panic value
   end
   
 else Context cancelled
   note right of cmd : State: Canceled
+end
 end
 
 cmd -> cmd : close(channel)

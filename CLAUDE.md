@@ -48,8 +48,12 @@ Ten packages under `pkg/`.
 - **`StartNew[T]`** — `New` + `Start` + `WaitReady`.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
-- **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown.
-- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started (`ErrActorReceiveOnStopped`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
+- **Start** succeeds at most once: an atomic `starting` flag (CAS) guards it, since state stays Initialized until the loop goroutine runs. Losers and later calls get `ErrActorAlreadyStarted`. A Start that fails validation (`ErrActorNilEntity`) releases the flag and may be retried.
+- **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown. Returns `ErrActorGracefulStopTimeout` on timeout (state StoppedWithError), or an error wrapping `ErrActorNotRunning` (with the state name) if not Started.
+- **Panics are terminal** — a panic recovered from a handler or `AfterStart` sets Panicked and the loop exits, so `Done()` closes (supervisors depend on this).
+- **Drain on exit** — on any loop exit (stop, ctx, panic) a deferred `drain()` closes `exiting` (wakes blocked senders), takes `sendMu` write lock and sets `closed`, then empties `input`, calling `Cancel(ErrActorCommandDropped)` on every `Cancelable`. `Receive` holds `sendMu` read lock for the send, so no accepted command is lost.
+- **`Cancelable`** — optional `Cancel(err error)` on executables; `GoCommand` implements it.
+- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started or after the loop has exited (`ErrActorReceiveOnStopped`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
 - Defaults: `inputBufSize = 1`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
 - Also: `Name()`, `Done()`, `InputBufferSize()`, `CheckState`, `State`.
@@ -64,7 +68,10 @@ Ten packages under `pkg/`.
 
 - **`GoCommand[E Entity, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished / Failed / Canceled / Panic.
-- On success: one value on `Done()`, then close. On failure/cancel/panic: close without a value; inspect `Error()`.
+- **Runs at most once** — `Execute` moves Created → Started under the mutex; repeat calls, or Execute after `Cancel`, are no-ops.
+- **`Cancel(err)`** — Created → Canceled, closes `Done()`; no-op once started (implements `actor.Cancelable`).
+- Terminal state/error are recorded **before** the result is sent, so a receiver sees the final `State()`.
+- On success: one value on `Done()`, then close. On failure/cancel/panic: close without a value; inspect `Error()`. Panic error is `errors.Join(ErrCommandPanic, <panic value>)` — compare with `errors.Is`.
 
 ### `pkg/ask` — Ask pattern (request/response convenience)
 
@@ -77,7 +84,7 @@ Ten packages under `pkg/`.
 - **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
 - **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
 - **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
-- Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
+- Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events; ignores `actor.ErrActorNotRunning` from actors that already terminated), `OnEvent`.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
 
 ### `pkg/supervision` — Supervisor for actor lifecycle management
@@ -90,6 +97,7 @@ Ten packages under `pkg/`.
 - Options: `WithPolicy`, `WithStopTimeout` (default 5s, used when stopping children on AllForOne / StopAll).
 - **Death watch** — `Watch(callback)` on any child termination (including clean stops).
 - **`OnRestartError(name, err)`** — stop/start failures during OneForOne/AllForOne restart attempts (not a termination event).
+- **`stopChild`** — used by `StopAll` and AllForOne; treats `actor.ErrActorNotRunning` (child already dead) as success.
 - **`StartAll(ctx, readyTimeout)`** — `readyTimeout` is unused; `ChildSpec.Start` owns readiness (e.g. `actor.StartNew`) and must treat `ctx` as actor lifetime, not a short start deadline.
 - Version-tracked monitors prevent stale restart cascades.
 - Also: `Add`, `StartAll`, `StopAll` (LIFO), `Children()`, `ChildState(name)`.
@@ -102,7 +110,7 @@ Ten packages under `pkg/`.
 
 ### `pkg/deadletter` — Dead letter queue
 
-- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Default capacity 1000, oldest evicted. Thread-safe.
+- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Default capacity 1000, oldest evicted. Capacity `<= 0` retains nothing but still notifies handlers. Thread-safe.
 - **`Letter`** — `Target` (actor name), `Reason`.
 - **`OnDeadLetter`**, **`Letters()`** (copy), **`Count()`**, **`Clear()`**.
 
@@ -143,6 +151,7 @@ Ten packages under `pkg/`.
 
 - Heavy use of Go generics for type safety — avoid raw `interface{}`.
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
-- Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`.
+- Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`. A recovered actor panic terminates the actor.
+- Prefer sentinel errors (wrap with `%w`) over ad-hoc `fmt.Errorf` so callers can use `errors.Is`.
 - Test naming convention: `TestX_Condition_ShouldY` (behavior-driven).
 - Linting: golangci-lint **v2.15** (CI), 22 linters enabled (`default: none` then an explicit enable list). Key limits: line length 140, cyclomatic complexity 15, function length 100 lines / 50 statements. Test files are excluded from funlen, dupl, goconst, gocyclo, gosec. Formatters: gofmt + goimports (local prefix: `github.com/barnowlsnest/go-actorlib`).
