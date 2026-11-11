@@ -277,7 +277,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecoverAndS
 	}
 
 	s.Equal(Panic, cmd.State())
-	s.Equal(ErrCommandPanic, cmd.Error())
+	s.ErrorIs(cmd.Error(), ErrCommandPanic)
 }
 
 func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentTypes_ShouldRecoverCorrectly() {
@@ -312,7 +312,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentTypes
 			}
 
 			assert.Equal(t, Panic, cmd.State())
-			assert.Equal(t, ErrCommandPanic, cmd.Error())
+			assert.ErrorIs(t, cmd.Error(), ErrCommandPanic)
 		})
 	}
 }
@@ -592,6 +592,25 @@ func (s *GoCommandTestSuite) TestCancel_Twice_ShouldNotPanic() {
 	s.NotPanics(func() { cmd.Cancel(errors.New("second")) })
 }
 
+func (s *GoCommandTestSuite) TestExecute_Twice_ShouldRunDelegateOnceAndNotPanic() {
+	// Arrange
+	calls := 0
+	cmd := New(func(_ *TestEntity) (int, error) {
+		calls++
+		return calls, nil
+	})
+	entity := NewTestEntity("v", true)
+	cmd.Execute(s.ctx, entity)
+
+	// Act
+	s.NotPanics(func() { cmd.Execute(s.ctx, entity) })
+
+	// Assert
+	s.Equal(1, calls)
+	s.Equal(Finished, cmd.State())
+	s.Equal(1, <-cmd.Done())
+}
+
 func (s *GoCommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic() {
 	// Arrange
 	called := false
@@ -609,4 +628,33 @@ func (s *GoCommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic
 	s.False(called)
 	s.Equal(Canceled, cmd.State())
 	s.ErrorIs(cmd.Error(), cause)
+}
+
+func (s *GoCommandTestSuite) TestExecute_DelegatePanic_ShouldPreservePanicValue() {
+	cmd := New(func(_ *TestEntity) (int, error) { panic("disk on fire") })
+
+	cmd.Execute(s.ctx, NewTestEntity("v", true))
+
+	s.ErrorIs(cmd.Error(), ErrCommandPanic)
+	s.ErrorContains(cmd.Error(), "disk on fire")
+}
+
+func (s *GoCommandTestSuite) TestExecute_DelegatePanicWithError_ShouldWrapIt() {
+	cause := errors.New("cause")
+	cmd := New(func(_ *TestEntity) (int, error) { panic(cause) })
+
+	cmd.Execute(s.ctx, NewTestEntity("v", true))
+
+	s.ErrorIs(cmd.Error(), ErrCommandPanic)
+	s.ErrorIs(cmd.Error(), cause)
+}
+
+func (s *GoCommandTestSuite) TestExecute_Success_ShouldReportFinishedOnceResultIsReceived() {
+	for range 20000 {
+		cmd := New(func(_ *TestEntity) (int, error) { return 1, nil })
+		go cmd.Execute(s.ctx, NewTestEntity("v", true))
+
+		<-cmd.Done()
+		s.Require().Equal(Finished, cmd.State())
+	}
 }
