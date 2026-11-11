@@ -492,7 +492,8 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 // This method blocks until shutdown completes or times out.
 // It can only be called on actors in the Started state.
 //
-// Returns an error if the actor is not in the correct state for stopping.
+// Returns [ErrActorGracefulStopTimeout] if the actor does not terminate within
+// the timeout, or an error if the actor is not in the correct state for stopping.
 func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 	if !atomic.CompareAndSwapUint64(&ga.state, Started, Stopping) {
 		return fmt.Errorf("actor state mismatch: expected %d, got %d", Started, atomic.LoadUint64(&ga.state))
@@ -503,12 +504,15 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
+	var err error
+
 	select {
 	case <-ga.done:
 		atomic.StoreUint64(&ga.state, Done)
 	case <-timer.C:
 		atomic.StoreUint64(&ga.state, StoppedWithError)
 		ga.hooks.OnError(ErrActorGracefulStopTimeout)
+		err = ErrActorGracefulStopTimeout
 	}
 
 	func() {
@@ -516,7 +520,7 @@ func (ga *GoActor[T]) Stop(timeout time.Duration) error {
 		ga.hooks.AfterStop()
 	}()
 
-	return nil
+	return err
 }
 
 // WithInputBufferSize configures the size of the actor's input message buffer.
