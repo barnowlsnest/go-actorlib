@@ -33,10 +33,10 @@ func (c *funcCancelCommand) Cancel(err error) {
 // startBlocked starts an actor, occupies it with a blocking command and
 // returns the release channel.
 func startBlocked(
-	t *testing.T, ctx context.Context, opts ...GoActorOption[TestEntity],
+	t *testing.T, ctx context.Context, opts ...Option[TestEntity],
 ) (a *Actor[TestEntity], release chan struct{}) {
 	t.Helper()
-	all := append([]GoActorOption[TestEntity]{
+	all := append([]Option[TestEntity]{
 		WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
 		WithInputBufferSize[TestEntity](4),
 	}, opts...)

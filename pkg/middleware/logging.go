@@ -27,7 +27,7 @@ func Logging[T any](log *logger.Logger) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
 		return func(ctx context.Context, e actor.Executable[T], entity *T) {
 			actorName := ""
-			if ac := actor.GetGoActorContext[T](ctx); ac != nil {
+			if ac := actor.GetActorContext[T](ctx); ac != nil {
 				actorName = ac.Name()
 			}
 

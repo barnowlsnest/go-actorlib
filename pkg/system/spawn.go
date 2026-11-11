@@ -20,9 +20,9 @@ func (s *ActorSystem) Spawn[T any, PT actor.EntityPtr[T]](
 	name string,
 	provider actor.EntityProvider[T],
 	readyTimeout time.Duration,
-	opts ...actor.GoActorOption[T],
+	opts ...actor.Option[T],
 ) (*actorref.Ref[T], error) {
-	allOpts := make([]actor.GoActorOption[T], 0, len(opts)+2)
+	allOpts := make([]actor.Option[T], 0, len(opts)+2)
 	allOpts = append(allOpts, actor.WithProvider(provider), actor.WithName[T](name))
 	allOpts = append(allOpts, opts...)
 

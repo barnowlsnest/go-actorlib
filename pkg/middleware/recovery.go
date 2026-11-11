@@ -28,7 +28,7 @@ func Recovery[T any](log *logger.Logger) actor.Middleware[T] {
 			defer func() {
 				if r := recover(); r != nil {
 					actorName := ""
-					if ac := actor.GetGoActorContext[T](ctx); ac != nil {
+					if ac := actor.GetActorContext[T](ctx); ac != nil {
 						actorName = ac.Name()
 					}
 

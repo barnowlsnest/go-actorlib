@@ -202,14 +202,14 @@ type (
 		middleware []Middleware[T]
 		handler    HandlerFunc[T]
 		behavior   *BehaviorStack[T]
-		actorCtx   *GoActorContext[T]
+		actorCtx   *ActorContext[T]
 	}
 
-	// GoActorOption defines a function type for configuring actors during creation.
+	// Option defines a function type for configuring actors during creation.
 	//
 	// Options follow the functional options pattern, allowing flexible
 	// and extensible actor configuration.
-	GoActorOption[T any] func(*Actor[T]) *Actor[T]
+	Option[T any] func(*Actor[T]) *Actor[T]
 )
 
 // defaultInputBufSize is the mailbox capacity when WithInputBufferSize is not set.
@@ -229,7 +229,7 @@ const defaultInputBufSize = 16
 // If no hooks are provided, a no-op implementation is used.
 //
 // Returns an error if the provider is nil or if any configuration is invalid.
-func New[T any, PT EntityPtr[T]](opts ...GoActorOption[T]) (*Actor[T], error) {
+func New[T any, PT EntityPtr[T]](opts ...Option[T]) (*Actor[T], error) {
 	actor := &Actor[T]{
 		inputBufSize:   defaultInputBufSize,
 		receiveTimeout: 5 * time.Second, // default receive timeout
@@ -450,7 +450,7 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 
 	a.buildHandler()
 	a.behavior = newBehaviorStack(a.handler)
-	a.actorCtx = &GoActorContext[T]{
+	a.actorCtx = &ActorContext[T]{
 		behavior: a.behavior,
 		name:     a.name,
 	}
@@ -465,7 +465,7 @@ func (a *Actor[T]) Start(ctx context.Context) error {
 		defer a.drain()
 
 		// Enrich context with actor context for handlers and middleware
-		actorScopedCtx := withGoActorContext(ctx, a.actorCtx)
+		actorScopedCtx := withActorContext(ctx, a.actorCtx)
 
 		atomic.StoreUint64(&a.state, Started)
 		close(a.ready) // Signal that the actor is ready to receive messages
@@ -621,7 +621,7 @@ func (a *Actor[T]) Stop(timeout time.Duration) error {
 //
 // A buffer size of 0 creates an unbuffered channel, which means senders
 // will block until the actor is ready to process the message.
-func WithInputBufferSize[T any](inputBufSize int) GoActorOption[T] {
+func WithInputBufferSize[T any](inputBufSize int) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.inputBufSize = inputBufSize
 		return actor
@@ -635,7 +635,7 @@ func WithInputBufferSize[T any](inputBufSize int) GoActorOption[T] {
 //
 // If set to a positive duration, Receive will return an error if the message
 // cannot be queued within that timeframe. The default timeout is 5 seconds.
-func WithReceiveTimeout[T any](timeout time.Duration) GoActorOption[T] {
+func WithReceiveTimeout[T any](timeout time.Duration) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.receiveTimeout = timeout
 		return actor
@@ -649,7 +649,7 @@ func WithReceiveTimeout[T any](timeout time.Duration) GoActorOption[T] {
 // created without a provider.
 //
 // The provider's Provide() method is called once during actor startup.
-func WithProvider[T any](provider EntityProvider[T]) GoActorOption[T] {
+func WithProvider[T any](provider EntityProvider[T]) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.provider = provider
 		return actor
@@ -657,8 +657,8 @@ func WithProvider[T any](provider EntityProvider[T]) GoActorOption[T] {
 }
 
 // WithName configures the actor's name.
-// The name is available via GoActorContext.Name() during message processing.
-func WithName[T any](name string) GoActorOption[T] {
+// The name is available via ActorContext.Name() during message processing.
+func WithName[T any](name string) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.name = name
 		return actor
@@ -683,7 +683,7 @@ func (a *Actor[T]) Done() <-chan struct{} {
 //
 // All hook methods should be non-blocking and handle errors gracefully,
 // as they run within the actor's critical execution paths.
-func WithHooks[T any](hooks Hooks) GoActorOption[T] {
+func WithHooks[T any](hooks Hooks) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.hooks = hooks
 		return actor

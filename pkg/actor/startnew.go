@@ -12,7 +12,7 @@ import (
 //
 // Returns the started actor or an error if any step fails.
 // If WaitReady fails after a successful Start, the actor is stopped best-effort.
-func StartNew[T any, PT EntityPtr[T]](ctx context.Context, readyTimeout time.Duration, opts ...GoActorOption[T]) (*Actor[T], error) {
+func StartNew[T any, PT EntityPtr[T]](ctx context.Context, readyTimeout time.Duration, opts ...Option[T]) (*Actor[T], error) {
 	a, err := New[T, PT](opts...)
 	if err != nil {
 		return nil, err

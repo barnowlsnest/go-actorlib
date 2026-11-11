@@ -488,7 +488,7 @@ func (s *MiddlewareTestSuite) TestActor_WithoutMiddleware_ShouldHaveZeroOverhead
 
 // --- Benchmarks ---
 
-func BenchmarkGoActor_NoMiddleware(b *testing.B) {
+func BenchmarkActor_NoMiddleware(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 
@@ -521,7 +521,7 @@ func BenchmarkGoActor_NoMiddleware(b *testing.B) {
 	}
 }
 
-func BenchmarkGoActor_SingleMiddleware(b *testing.B) {
+func BenchmarkActor_SingleMiddleware(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 
@@ -563,7 +563,7 @@ func BenchmarkGoActor_SingleMiddleware(b *testing.B) {
 	}
 }
 
-func BenchmarkGoActor_FiveMiddlewares(b *testing.B) {
+func BenchmarkActor_FiveMiddlewares(b *testing.B) {
 	entity := NewTestEntity("bench", true)
 	provider := NewTestEntityProvider(entity)
 

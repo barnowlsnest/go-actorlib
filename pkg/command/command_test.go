@@ -63,31 +63,31 @@ func (te *TestEntity) ClearCallLog() {
 	te.callLog = te.callLog[:0]
 }
 
-// GoCommandTestSuite provides a test suite for Command
-type GoCommandTestSuite struct {
+// CommandTestSuite provides a test suite for Command
+type CommandTestSuite struct {
 	suite.Suite
 	ctx    context.Context
 	cancel context.CancelFunc
 	entity *TestEntity
 }
 
-func (s *GoCommandTestSuite) SetupTest() {
+func (s *CommandTestSuite) SetupTest() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.entity = NewTestEntity("test-value", true)
 }
 
-func (s *GoCommandTestSuite) TearDownTest() {
+func (s *CommandTestSuite) TearDownTest() {
 	if s.cancel != nil {
 		s.cancel()
 	}
 }
 
-func TestGoCommandTestSuite(t *testing.T) {
-	suite.Run(t, new(GoCommandTestSuite))
+func TestCommandTestSuite(t *testing.T) {
+	suite.Run(t, new(CommandTestSuite))
 }
 
 // Test command creation and initialization
-func (s *GoCommandTestSuite) TestNew_ShouldCreateCommandWithCorrectInitialState() {
+func (s *CommandTestSuite) TestNew_ShouldCreateCommandWithCorrectInitialState() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return entity.GetValue(), nil
@@ -104,7 +104,7 @@ func (s *GoCommandTestSuite) TestNew_ShouldCreateCommandWithCorrectInitialState(
 	s.NotNil(cmd.delegateFn)
 }
 
-func (s *GoCommandTestSuite) TestNew_ShouldCreateChannelWithBufferSizeOne() {
+func (s *CommandTestSuite) TestNew_ShouldCreateChannelWithBufferSizeOne() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (int, error) {
 		return 42, nil
@@ -127,7 +127,7 @@ func (s *GoCommandTestSuite) TestNew_ShouldCreateChannelWithBufferSizeOne() {
 }
 
 // Test successful command execution
-func (s *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldReturnCorrectResult() {
+func (s *CommandTestSuite) TestExecute_SuccessfulExecution_ShouldReturnCorrectResult() {
 	// Arrange
 	expectedResult := "processed-test-value"
 	delegateFn := func(entity *TestEntity) (string, error) {
@@ -150,7 +150,7 @@ func (s *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldReturnCorrect
 	s.Nil(cmd.Error())
 }
 
-func (s *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldInteractWithEntity() {
+func (s *CommandTestSuite) TestExecute_SuccessfulExecution_ShouldInteractWithEntity() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (string, error) {
 		entity.SetValue("updated-value")
@@ -175,7 +175,7 @@ func (s *GoCommandTestSuite) TestExecute_SuccessfulExecution_ShouldInteractWithE
 }
 
 // Test command execution with delegate function error
-func (s *GoCommandTestSuite) TestExecute_DelegateFunctionError_ShouldSetFailedState() {
+func (s *CommandTestSuite) TestExecute_DelegateFunctionError_ShouldSetFailedState() {
 	// Arrange
 	expectedError := errors.New("delegate function failed")
 	delegateFn := func(entity *TestEntity) (string, error) {
@@ -199,7 +199,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegateFunctionError_ShouldSetFailedSt
 }
 
 // Test context cancellation
-func (s *GoCommandTestSuite) TestExecute_ContextCancellation_ShouldSetCanceledState() {
+func (s *CommandTestSuite) TestExecute_ContextCancellation_ShouldSetCanceledState() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return "should not reach here", nil
@@ -226,7 +226,7 @@ func (s *GoCommandTestSuite) TestExecute_ContextCancellation_ShouldSetCanceledSt
 	s.ErrorIs(cmd.Error(), context.Canceled)
 }
 
-func (s *GoCommandTestSuite) TestExecute_ContextCancellationDuringExecution_ShouldNotAffectRunningCommand() {
+func (s *CommandTestSuite) TestExecute_ContextCancellationDuringExecution_ShouldNotAffectRunningCommand() {
 	// Arrange
 	started := make(chan struct{})
 	delegateFn := func(entity *TestEntity) (string, error) {
@@ -258,7 +258,7 @@ func (s *GoCommandTestSuite) TestExecute_ContextCancellationDuringExecution_Shou
 }
 
 // Test panic recovery
-func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecoverAndSetPanicState() {
+func (s *CommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecoverAndSetPanicState() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (string, error) {
 		panic("something went wrong")
@@ -280,7 +280,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanic_ShouldRecoverAndS
 	s.ErrorIs(cmd.Error(), ErrCommandPanic)
 }
 
-func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentTypes_ShouldRecoverCorrectly() {
+func (s *CommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentTypes_ShouldRecoverCorrectly() {
 	testCases := []struct {
 		name       string
 		panicValue interface{}
@@ -318,7 +318,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegateFunctionPanicWithDifferentTypes
 }
 
 // Test state transitions
-func (s *GoCommandTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
+func (s *CommandTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return "result", nil
@@ -350,7 +350,7 @@ func (s *GoCommandTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() 
 }
 
 // Test concurrent access to command state
-func (s *GoCommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
+func (s *CommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	// Arrange
 	delegateFn := func(entity *TestEntity) (int, error) {
 		time.Sleep(50 * time.Millisecond)
@@ -399,7 +399,7 @@ func (s *GoCommandTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 }
 
 // Test command with different result types
-func (s *GoCommandTestSuite) TestExecute_DifferentResultTypes_ShouldWork() {
+func (s *CommandTestSuite) TestExecute_DifferentResultTypes_ShouldWork() {
 	testCases := []struct {
 		name     string
 		delegate interface{}
@@ -505,7 +505,7 @@ func (s *GoCommandTestSuite) TestExecute_DifferentResultTypes_ShouldWork() {
 }
 
 // Benchmark tests
-func BenchmarkGoCommand_Execute_Success(b *testing.B) {
+func BenchmarkCommand_Execute_Success(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return entity.GetValue(), nil
@@ -520,7 +520,7 @@ func BenchmarkGoCommand_Execute_Success(b *testing.B) {
 	}
 }
 
-func BenchmarkGoCommand_Execute_WithError(b *testing.B) {
+func BenchmarkCommand_Execute_WithError(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	delegateFn := func(entity *TestEntity) (string, error) {
 		return "", errors.New("benchmark error")
@@ -535,7 +535,7 @@ func BenchmarkGoCommand_Execute_WithError(b *testing.B) {
 	}
 }
 
-func BenchmarkGoCommand_ConcurrentStateAccess(b *testing.B) {
+func BenchmarkCommand_ConcurrentStateAccess(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	delegateFn := func(entity *TestEntity) (string, error) {
 		time.Sleep(10 * time.Millisecond) // Simulate work
@@ -557,7 +557,7 @@ func BenchmarkGoCommand_ConcurrentStateAccess(b *testing.B) {
 	})
 }
 
-func (s *GoCommandTestSuite) TestCancel_BeforeExecute_ShouldCloseDoneWithError() {
+func (s *CommandTestSuite) TestCancel_BeforeExecute_ShouldCloseDoneWithError() {
 	// Arrange
 	cmd := New(func(_ *TestEntity) (string, error) { return "never", nil })
 	cause := errors.New("dropped")
@@ -572,7 +572,7 @@ func (s *GoCommandTestSuite) TestCancel_BeforeExecute_ShouldCloseDoneWithError()
 	s.ErrorIs(cmd.Error(), cause)
 }
 
-func (s *GoCommandTestSuite) TestCancel_AfterExecute_ShouldBeNoOp() {
+func (s *CommandTestSuite) TestCancel_AfterExecute_ShouldBeNoOp() {
 	// Arrange
 	cmd := New(func(_ *TestEntity) (string, error) { return "ok", nil })
 	cmd.Execute(s.ctx, NewTestEntity("v", true))
@@ -586,13 +586,13 @@ func (s *GoCommandTestSuite) TestCancel_AfterExecute_ShouldBeNoOp() {
 	s.Equal("ok", <-cmd.Done())
 }
 
-func (s *GoCommandTestSuite) TestCancel_Twice_ShouldNotPanic() {
+func (s *CommandTestSuite) TestCancel_Twice_ShouldNotPanic() {
 	cmd := New(func(_ *TestEntity) (string, error) { return "", nil })
 	cmd.Cancel(errors.New("first"))
 	s.NotPanics(func() { cmd.Cancel(errors.New("second")) })
 }
 
-func (s *GoCommandTestSuite) TestExecute_Twice_ShouldRunDelegateOnceAndNotPanic() {
+func (s *CommandTestSuite) TestExecute_Twice_ShouldRunDelegateOnceAndNotPanic() {
 	// Arrange
 	calls := 0
 	cmd := New(func(_ *TestEntity) (int, error) {
@@ -611,7 +611,7 @@ func (s *GoCommandTestSuite) TestExecute_Twice_ShouldRunDelegateOnceAndNotPanic(
 	s.Equal(1, <-cmd.Done())
 }
 
-func (s *GoCommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic() {
+func (s *CommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic() {
 	// Arrange
 	called := false
 	cmd := New(func(_ *TestEntity) (int, error) {
@@ -630,7 +630,7 @@ func (s *GoCommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic
 	s.ErrorIs(cmd.Error(), cause)
 }
 
-func (s *GoCommandTestSuite) TestExecute_DelegatePanic_ShouldPreservePanicValue() {
+func (s *CommandTestSuite) TestExecute_DelegatePanic_ShouldPreservePanicValue() {
 	cmd := New(func(_ *TestEntity) (int, error) { panic("disk on fire") })
 
 	cmd.Execute(s.ctx, NewTestEntity("v", true))
@@ -639,7 +639,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegatePanic_ShouldPreservePanicValue(
 	s.ErrorContains(cmd.Error(), "disk on fire")
 }
 
-func (s *GoCommandTestSuite) TestExecute_DelegatePanicWithError_ShouldWrapIt() {
+func (s *CommandTestSuite) TestExecute_DelegatePanicWithError_ShouldWrapIt() {
 	cause := errors.New("cause")
 	cmd := New(func(_ *TestEntity) (int, error) { panic(cause) })
 
@@ -649,7 +649,7 @@ func (s *GoCommandTestSuite) TestExecute_DelegatePanicWithError_ShouldWrapIt() {
 	s.ErrorIs(cmd.Error(), cause)
 }
 
-func (s *GoCommandTestSuite) TestExecute_Success_ShouldReportFinishedOnceResultIsReceived() {
+func (s *CommandTestSuite) TestExecute_Success_ShouldReportFinishedOnceResultIsReceived() {
 	for range 20000 {
 		cmd := New(func(_ *TestEntity) (int, error) { return 1, nil })
 		go cmd.Execute(s.ctx, NewTestEntity("v", true))

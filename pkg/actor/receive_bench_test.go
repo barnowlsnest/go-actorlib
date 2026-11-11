@@ -12,11 +12,11 @@ type noopBenchCommand struct{}
 
 func (noopBenchCommand) Execute(context.Context, *TestEntity) {}
 
-func startBenchActor(b *testing.B, opts ...GoActorOption[TestEntity]) *Actor[TestEntity] {
+func startBenchActor(b *testing.B, opts ...Option[TestEntity]) *Actor[TestEntity] {
 	b.Helper()
 
 	provider := NewTestEntityProvider(NewTestEntity("bench", true))
-	opts = append([]GoActorOption[TestEntity]{WithProvider[TestEntity](provider)}, opts...)
+	opts = append([]Option[TestEntity]{WithProvider[TestEntity](provider)}, opts...)
 
 	a, err := StartNew(context.Background(), time.Second, opts...)
 	if err != nil {

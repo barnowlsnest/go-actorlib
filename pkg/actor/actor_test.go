@@ -178,8 +178,8 @@ func (th *TestHooks) ClearCalls() {
 	th.errors = th.errors[:0]
 }
 
-// GoActorTestSuite provides a test suite for Actor
-type GoActorTestSuite struct {
+// ActorTestSuite provides a test suite for Actor
+type ActorTestSuite struct {
 	suite.Suite
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -188,25 +188,25 @@ type GoActorTestSuite struct {
 	hooks    *TestHooks
 }
 
-func (s *GoActorTestSuite) SetupTest() {
+func (s *ActorTestSuite) SetupTest() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.entity = NewTestEntity("test-value", true)
 	s.provider = NewTestEntityProvider(s.entity)
 	s.hooks = NewTestHooks()
 }
 
-func (s *GoActorTestSuite) TearDownTest() {
+func (s *ActorTestSuite) TearDownTest() {
 	if s.cancel != nil {
 		s.cancel()
 	}
 }
 
-func TestGoActorTestSuite(t *testing.T) {
-	suite.Run(t, new(GoActorTestSuite))
+func TestActorTestSuite(t *testing.T) {
+	suite.Run(t, new(ActorTestSuite))
 }
 
 // Test actor creation and configuration
-func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
+func (s *ActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 	// Act
 	actor, err := New(WithProvider[TestEntity](s.provider))
 
@@ -220,7 +220,7 @@ func (s *GoActorTestSuite) TestNew_WithValidProvider_ShouldCreateActor() {
 	s.NotNil(actor.ready)
 }
 
-func (s *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
+func (s *ActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
 	// Act
 	actor, err := New[TestEntity]()
 
@@ -230,7 +230,7 @@ func (s *GoActorTestSuite) TestNew_WithoutProvider_ShouldReturnError() {
 	s.Equal(ErrActorNilProvider, err)
 }
 
-func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSize() {
+func (s *ActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSize() {
 	// Arrange
 	bufferSize := 10
 
@@ -245,7 +245,7 @@ func (s *GoActorTestSuite) TestNew_WithInputBufferSize_ShouldSetCorrectBufferSiz
 	s.Equal(bufferSize, actor.InputBufferSize())
 }
 
-func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() {
+func (s *ActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() {
 	// Arrange
 	timeout := 10 * time.Second
 
@@ -260,7 +260,7 @@ func (s *GoActorTestSuite) TestNew_WithReceiveTimeout_ShouldSetCorrectTimeout() 
 	s.Equal(timeout, actor.receiveTimeout)
 }
 
-func (s *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
+func (s *ActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
 	// Act
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -272,7 +272,7 @@ func (s *GoActorTestSuite) TestNew_WithHooks_ShouldSetCustomHooks() {
 	s.Equal(s.hooks, actor.hooks)
 }
 
-func (s *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
+func (s *ActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
 	// Act
 	actor, err := New(WithProvider[TestEntity](s.provider))
 
@@ -282,7 +282,7 @@ func (s *GoActorTestSuite) TestNew_WithoutHooks_ShouldUseNoopHooks() {
 }
 
 // Test actor lifecycle
-func (s *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
+func (s *ActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
 	// Arrange
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -308,7 +308,7 @@ func (s *GoActorTestSuite) TestStart_WithValidEntity_ShouldStartSuccessfully() {
 	s.Contains(calls, "AfterStart")
 }
 
-func (s *GoActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
+func (s *ActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
 	// Arrange - Create a provider that returns nil
 	nilProvider := &TestEntityProvider{entity: nil}
 	actor, err := New(WithProvider[TestEntity](nilProvider))
@@ -322,7 +322,7 @@ func (s *GoActorTestSuite) TestStart_WithNilEntity_ShouldReturnError() {
 	s.Equal(ErrActorNilEntity, err)
 }
 
-func (s *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError() {
+func (s *ActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError() {
 	// Arrange
 	nonProvidableEntity := NewTestEntity("test", false)
 	nonProvidableProvider := NewTestEntityProvider(nonProvidableEntity)
@@ -337,7 +337,7 @@ func (s *GoActorTestSuite) TestStart_WithNonProvidableEntity_ShouldReturnError()
 	s.Equal(ErrActorNilEntity, err)
 }
 
-func (s *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
+func (s *ActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 	// Arrange
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -364,7 +364,7 @@ func (s *GoActorTestSuite) TestStop_AfterStart_ShouldStopGracefully() {
 	s.Contains(calls, "AfterStop")
 }
 
-func (s *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
+func (s *ActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -376,7 +376,7 @@ func (s *GoActorTestSuite) TestStop_WithoutStart_ShouldReturnError() {
 	s.Error(err)
 }
 
-func (s *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
+func (s *ActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -389,7 +389,7 @@ func (s *GoActorTestSuite) TestWaitReady_BeforeStart_ShouldTimeout() {
 	s.Equal(context.DeadlineExceeded, err)
 }
 
-func (s *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
+func (s *ActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -407,7 +407,7 @@ func (s *GoActorTestSuite) TestWaitReady_AfterStart_ShouldReturnImmediately() {
 	s.Less(duration, 50*time.Millisecond)
 }
 
-func (s *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContextError() {
+func (s *ActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContextError() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -423,7 +423,7 @@ func (s *GoActorTestSuite) TestWaitReady_WithCancelledContext_ShouldReturnContex
 }
 
 // Test message receiving and processing
-func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfully() {
+func (s *ActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfully() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -455,7 +455,7 @@ func (s *GoActorTestSuite) TestReceive_WithValidCommand_ShouldExecuteSuccessfull
 	s.Contains(callLog, "SetValue:updated-by-command")
 }
 
-func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
+func (s *ActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -471,7 +471,7 @@ func (s *GoActorTestSuite) TestReceive_WithNilCommand_ShouldReturnError() {
 	s.Equal(ErrActorReceiveNil, err)
 }
 
-func (s *GoActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
+func (s *ActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
 
@@ -480,7 +480,7 @@ func (s *GoActorTestSuite) TestReceive_BeforeStart_ShouldReturnNotStarted() {
 	s.ErrorIs(err, ErrActorNotStarted)
 }
 
-func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
+func (s *ActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -504,7 +504,7 @@ func (s *GoActorTestSuite) TestReceive_OnStoppedActor_ShouldReturnError() {
 	s.Equal(ErrActorReceiveOnStopped, err)
 }
 
-func (s *GoActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast() {
+func (s *ActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast() {
 	for _, timeout := range []time.Duration{0, time.Second} {
 		// Arrange - mailbox has room, so only the ctx check can reject the send
 		actor, err := New(
@@ -537,7 +537,7 @@ func (s *GoActorTestSuite) TestReceive_WithCanceledContextAndRoom_ShouldFailFast
 	}
 }
 
-func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
+func (s *ActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 	// Arrange - zero timeout means no timeout
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -564,7 +564,7 @@ func (s *GoActorTestSuite) TestReceive_WithZeroTimeout_ShouldNotTimeout() {
 }
 
 // Test error handling and panic recovery
-func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
+func (s *ActorTestSuite) TestExecute_WithPanicInCommand_ShouldRecover() {
 	// Arrange
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -615,7 +615,7 @@ func (ph *PanicHooks) AfterStart() {
 	panic("hook panic")
 }
 
-func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
+func (s *ActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	// Arrange
 	baseHooks := NewTestHooks()
 	panicHooks := &PanicHooks{TestHooks: baseHooks}
@@ -641,7 +641,7 @@ func (s *GoActorTestSuite) TestExecute_WithHookPanic_ShouldRecover() {
 	s.True(state == uint64(Started) || state == uint64(Panicked))
 }
 
-func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
+func (s *ActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
 	// Arrange
 	actor, err := StartNew(s.ctx, 100*time.Millisecond, WithProvider[TestEntity](s.provider))
 	s.Require().NoError(err)
@@ -662,7 +662,7 @@ func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldCloseDone() {
 	s.Equal(uint64(Panicked), actor.State())
 }
 
-func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldNotProcessQueuedCommands() {
+func (s *ActorTestSuite) TestExecute_WithPanicInCommand_ShouldNotProcessQueuedCommands() {
 	// Arrange
 	actor, err := StartNew(s.ctx, 100*time.Millisecond,
 		WithProvider[TestEntity](s.provider),
@@ -692,7 +692,7 @@ func (s *GoActorTestSuite) TestExecute_WithPanicInCommand_ShouldNotProcessQueued
 	s.False(queued.IsExecuted())
 }
 
-func (s *GoActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
+func (s *ActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
 	// Arrange
 	panicHooks := &PanicHooks{TestHooks: NewTestHooks()}
 
@@ -712,7 +712,7 @@ func (s *GoActorTestSuite) TestStart_WithAfterStartHookPanic_ShouldCloseDone() {
 }
 
 // Test context handling
-func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
+func (s *ActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully() {
 	// Arrange
 	actor, err := New(
 		WithProvider[TestEntity](s.provider),
@@ -749,7 +749,7 @@ func (s *GoActorTestSuite) TestStart_WithCancelledContext_ShouldHandleGracefully
 }
 
 // Test state transitions
-func (s *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
+func (s *ActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -773,7 +773,7 @@ func (s *GoActorTestSuite) TestStateTransitions_ShouldFollowCorrectSequence() {
 	s.Equal(uint64(Done), actor.State())
 }
 
-func (s *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
+func (s *ActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -785,7 +785,7 @@ func (s *GoActorTestSuite) TestCheckState_WithCorrectState_ShouldReturnNil() {
 	s.NoError(err)
 }
 
-func (s *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError() {
+func (s *ActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -798,7 +798,7 @@ func (s *GoActorTestSuite) TestCheckState_WithIncorrectState_ShouldReturnError()
 }
 
 // Test concurrent access
-func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
+func (s *ActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -851,7 +851,7 @@ func (s *GoActorTestSuite) TestConcurrentAccess_ShouldBeSafe() {
 	s.Greater(atomic.LoadInt64(&executionCount), int64(0))
 }
 
-func (s *GoActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
+func (s *ActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
 	// Arrange
 	actor, err := New(WithProvider[TestEntity](s.provider))
 	s.NoError(err)
@@ -892,7 +892,7 @@ func (s *GoActorTestSuite) TestConcurrentStop_ShouldNotPanic() {
 }
 
 // Benchmark tests
-func BenchmarkGoActor_CreateAndStart(b *testing.B) {
+func BenchmarkActor_CreateAndStart(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
 
@@ -919,7 +919,7 @@ func BenchmarkGoActor_CreateAndStart(b *testing.B) {
 	}
 }
 
-func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
+func BenchmarkActor_ReceiveCommand(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
 
@@ -955,7 +955,7 @@ func BenchmarkGoActor_ReceiveCommand(b *testing.B) {
 	}
 }
 
-func BenchmarkGoActor_ConcurrentStateAccess(b *testing.B) {
+func BenchmarkActor_ConcurrentStateAccess(b *testing.B) {
 	entity := NewTestEntity("bench-test", true)
 	provider := NewTestEntityProvider(entity)
 

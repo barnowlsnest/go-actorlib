@@ -27,7 +27,7 @@ func Chain[T any](middlewares ...Middleware[T]) Middleware[T] {
 // WithMiddleware configures middleware for the actor's command execution pipeline.
 // Multiple calls to WithMiddleware append to the existing middleware slice.
 // Middleware is composed once at Start() time, so there is no per-message overhead.
-func WithMiddleware[T any](middlewares ...Middleware[T]) GoActorOption[T] {
+func WithMiddleware[T any](middlewares ...Middleware[T]) Option[T] {
 	return func(actor *Actor[T]) *Actor[T] {
 		actor.middleware = append(actor.middleware, middlewares...)
 		return actor
