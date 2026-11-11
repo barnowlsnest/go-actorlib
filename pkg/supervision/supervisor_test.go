@@ -635,3 +635,80 @@ func (r *recordingStartNewSpec) last() ChildRef {
 	defer r.mu.Unlock()
 	return r.ref
 }
+
+type blockCommand struct{ started, release chan struct{} }
+
+func (b blockCommand) Execute(context.Context, *supervisedEntity) {
+	close(b.started)
+	<-b.release
+}
+
+// overlapSpec flags a start that happens while the previous instance is still running.
+type overlapSpec struct {
+	mu      sync.Mutex
+	last    *actorref.Ref[*supervisedEntity]
+	starts  atomic.Int32
+	overlap atomic.Bool
+}
+
+func (o *overlapSpec) Start(ctx context.Context) (ChildRef, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if o.last != nil {
+		select {
+		case <-o.last.Done():
+		default:
+			o.overlap.Store(true)
+		}
+	}
+
+	a, err := actor.StartNew(ctx, time.Second,
+		actor.WithProvider(&supervisedEntityProvider{&supervisedEntity{}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	ref, err := actorref.New(a)
+	if err != nil {
+		return nil, err
+	}
+	o.last = ref
+	o.starts.Add(1)
+	return ref, nil
+}
+
+func (o *overlapSpec) current() *actorref.Ref[*supervisedEntity] {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.last
+}
+
+func (s *SupervisorTestSuite) TestAllForOne_WithSiblingStopping_ShouldWaitBeforeRestartingIt() {
+	// Arrange
+	sup := NewSupervisor(WithPolicy(RestartPolicy{Strategy: AllForOne}))
+	sibling := &overlapSpec{}
+	failing := &overlapSpec{}
+	s.Require().NoError(sup.Add("sibling", sibling))
+	s.Require().NoError(sup.Add("failing", failing))
+	s.Require().NoError(sup.StartAll(s.ctx, 0))
+
+	// Hold the sibling in Stopping: a slow handler plus an external Stop.
+	block := blockCommand{started: make(chan struct{}), release: make(chan struct{})}
+	s.Require().NoError(sibling.current().Send(s.ctx, block))
+	<-block.started
+	go func() { _ = sibling.current().Stop(5 * time.Second) }()
+	s.Require().Eventually(func() bool {
+		return sibling.current().State() == uint64(actor.Stopping)
+	}, time.Second, time.Millisecond)
+
+	// Act — fail the other child to trigger an AllForOne restart.
+	s.Require().NoError(failing.current().Send(s.ctx, panicCommand{}))
+	time.Sleep(50 * time.Millisecond)
+	close(block.release)
+
+	// Assert
+	s.Eventually(func() bool { return sibling.starts.Load() == 2 }, 2*time.Second, 10*time.Millisecond)
+	s.False(sibling.overlap.Load(), "sibling restarted while its previous instance was still running")
+	s.NoError(sup.StopAll(time.Second))
+}

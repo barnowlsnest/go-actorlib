@@ -26,6 +26,7 @@ package supervision
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -384,10 +385,28 @@ func (s *Supervisor) ChildState(name string) (uint64, error) {
 	return c.ref.State(), nil
 }
 
-// stopChild stops ref, treating a child that already terminated as success.
+// stopChild stops ref and returns once it has exited.
+//
+// actor.ErrActorNotRunning covers both terminated children and children that
+// another caller is still stopping (state Stopping), so it is treated as success
+// only after ref.Done() closes — otherwise a restart could run a replacement
+// alongside the old instance.
 func stopChild(ref ChildRef, timeout time.Duration) error {
-	if err := ref.Stop(timeout); err != nil && !errors.Is(err, actor.ErrActorNotRunning) {
+	err := ref.Stop(timeout)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, actor.ErrActorNotRunning) {
 		return err
 	}
-	return nil
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-ref.Done():
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("%w: child did not exit within %v (%w)", actor.ErrActorGracefulStopTimeout, timeout, err)
+	}
 }
