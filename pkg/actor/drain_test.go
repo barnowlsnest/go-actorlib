@@ -61,7 +61,9 @@ func TestStop_WithQueuedCommands_ShouldCancelThem(t *testing.T) {
 
 	stopped := make(chan error, 1)
 	go func() { stopped <- a.Stop(time.Second) }()
-	require.Eventually(t, func() bool { return a.State() == Stopping }, time.Second, time.Millisecond)
+	// Wait for the stop signal itself: Stop sets Stopping before it closes the
+	// stop channel, so the state alone does not mean the loop will see it.
+	<-a.stop
 	close(release)
 	require.NoError(t, <-stopped)
 

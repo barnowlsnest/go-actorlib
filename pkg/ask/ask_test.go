@@ -272,7 +272,7 @@ func BenchmarkNew_Success(b *testing.B) {
 	}
 }
 
-func (s *GoAskTestSuite) TestAwait_QueuedWhenActorStops_ShouldReturnDroppedErrorPromptly() {
+func (s *GoAskTestSuite) TestAwait_QueuedWhenActorTerminates_ShouldReturnDroppedErrorPromptly() {
 	// Arrange — occupy the actor so the ask stays queued
 	started, release := make(chan struct{}), make(chan struct{})
 	blocker := command.New(func(_ *TestEntity) (struct{}, error) {
@@ -289,13 +289,13 @@ func (s *GoAskTestSuite) TestAwait_QueuedWhenActorStops_ShouldReturnDroppedError
 	type result struct{ err error }
 	results := make(chan result, 1)
 	go func() {
-		_, err := Await(s.ctx, queued, 5*time.Second)
+		_, err := Await(context.Background(), queued, 5*time.Second)
 		results <- result{err}
 	}()
 
-	// Act
-	go func() { _ = s.ref.Stop(time.Second) }()
-	s.Require().Eventually(func() bool { return s.actor.State() == actor.Stopping }, time.Second, time.Millisecond)
+	// Act — terminate via the actor's context: it is canceled before the
+	// blocker returns, so the loop sees it before it could dequeue the ask.
+	s.cancel()
 	close(release)
 
 	// Assert
