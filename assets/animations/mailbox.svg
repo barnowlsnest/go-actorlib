@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="280" viewBox="0 0 860 280" role="img" aria-label="Animation: goroutines send commands into a bounded mailbox; the actor executes them one at a time">
+<title>Animation: goroutines send commands into a bounded mailbox; the actor executes them one at a time</title>
+
+<style>
+  :root{--bg:#ffffff;--panel:#f6f8fa;--border:#d0d7de;--fg:#1f2328;--muted:#59636e;
+        --accent:#0969da;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;
+        --c1:#0969da;--c2:#8250df;--c3:#bf3989;--c4:#1a7f37;}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--muted:#9198a1;
+          --accent:#4493f8;--ok:#3fb950;--bad:#f85149;--warn:#d29922;
+          --c1:#4493f8;--c2:#a371f7;--c3:#db61a2;--c4:#3fb950;}
+  }
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .bg{fill:var(--bg);stroke:var(--border)}
+  .panel{fill:var(--panel);stroke:var(--border);stroke-width:1.5}
+  .muted{fill:var(--muted)}
+  .title{font-size:16px;font-weight:600}
+  .small{font-size:12px}
+  .tiny{font-size:11px}
+  .slot{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 3}
+  .edge{fill:none;stroke:var(--border);stroke-width:1.5}
+  .chiptext{font-size:12px;font-weight:600;fill:#ffffff}
+  .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .accent{fill:var(--accent)}
+  .okS{stroke:var(--ok)} .badS{stroke:var(--bad)} .accentS{stroke:var(--accent)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="859" height="279" rx="12"/>
+<text class="title" x="24" y="34">Mailbox: commands are processed one at a time</text>
+<text class="small muted" x="24" y="54">Many goroutines send, only the actor goroutine touches the entity, so no mutex is needed.</text>
+<circle cx="70" cy="85" r="16" class="panel"/>
+<text class="tiny muted" x="70" y="89" text-anchor="middle">g1</text>
+<path class="edge" d="M88 85 C 180 85, 200 145, 270 145" stroke-dasharray="3 4"/>
+<circle cx="70" cy="145" r="16" class="panel"/>
+<text class="tiny muted" x="70" y="149" text-anchor="middle">g2</text>
+<path class="edge" d="M88 145 C 180 145, 200 145, 270 145" stroke-dasharray="3 4"/>
+<circle cx="70" cy="205" r="16" class="panel"/>
+<text class="tiny muted" x="70" y="209" text-anchor="middle">g3</text>
+<path class="edge" d="M88 205 C 180 205, 200 145, 270 145" stroke-dasharray="3 4"/>
+<text class="tiny muted" x="70" y="245" text-anchor="middle">senders</text>
+<text class="tiny muted" x="70" y="258" text-anchor="middle">ref.Send(ctx, cmd)</text>
+<rect class="panel" x="272" y="117" width="286" height="56" rx="8"/>
+<rect class="slot" x="489" y="127" width="62" height="36" rx="6"/>
+<rect class="slot" x="419" y="127" width="62" height="36" rx="6"/>
+<rect class="slot" x="349" y="127" width="62" height="36" rx="6"/>
+<rect class="slot" x="279" y="127" width="62" height="36" rx="6"/>
+<text class="tiny muted" x="415" y="191" text-anchor="middle">bounded mailbox (chan, default size 16)</text>
+<path class="edge" d="M558 145 L610 145" marker-end=""/>
+<rect class="panel" x="610" y="70" width="220" height="150" rx="10"/><text class="title mono" x="624" y="94">Actor[Counter]</text><text class="small muted" x="624" y="114">one goroutine</text><text class="small muted" x="624" y="131">owns *Counter</text>
+<rect x="624" y="160" width="192" height="40" rx="6" style="fill:var(--bg);stroke:var(--border)"/>
+<text class="small mono muted" x="634" y="185">c.Value =</text>
+<text class="title mono accent" x="722" y="186" opacity="0">0<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="1;1;0;0;1;1" keyTimes="0.0000;0.4100;0.4111;0.9656;0.9667;1.0000"/></text>
+<text class="title mono accent" x="722" y="186" opacity="0">1<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.4100;0.4111;0.5433;0.5444;1.0000"/></text>
+<text class="title mono accent" x="722" y="186" opacity="0">2<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.5433;0.5444;0.6767;0.6778;1.0000"/></text>
+<text class="title mono accent" x="722" y="186" opacity="0">3<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6767;0.6778;0.8100;0.8111;1.0000"/></text>
+<text class="title mono accent" x="722" y="186" opacity="0">4<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.8100;0.8111;0.9656;0.9667;1.0000"/></text>
+<circle cx="802" cy="92" r="6" class="ok" opacity="0"><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0;1;1;0;0;1;1;0;0;1;1;0;0" keyTimes="0.0000;0.3722;0.3778;0.4167;0.4222;0.5056;0.5111;0.5500;0.5556;0.6389;0.6444;0.6833;0.6889;0.7722;0.7778;0.8167;0.8222;1.0000"/></circle>
+<text class="tiny muted" x="790" y="96" text-anchor="end" opacity="0">Execute<animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0;1;1;0;0;1;1;0;0;1;1;0;0" keyTimes="0.0000;0.3722;0.3778;0.4167;0.4222;0.5056;0.5111;0.5500;0.5556;0.6389;0.6444;0.6833;0.6889;0.7722;0.7778;0.8167;0.8222;1.0000"/></text>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c1)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">+1</text><animateTransform attributeName="transform" type="translate" dur="9.0s" repeatCount="indefinite" values="70.0 85.0;70.0 85.0;270.0 145.0;520.0 145.0;520.0 145.0;720.0 180.0;720.0 180.0" keyTimes="0.0000;0.0444;0.0833;0.1222;0.3333;0.3778;1.0000"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.0433;0.0444;0.3778;0.4167;1.0000"/></g>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c2)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">+1</text><animateTransform attributeName="transform" type="translate" dur="9.0s" repeatCount="indefinite" values="70.0 145.0;70.0 145.0;270.0 145.0;450.0 145.0;450.0 145.0;520.0 145.0;520.0 145.0;720.0 180.0;720.0 180.0" keyTimes="0.0000;0.0944;0.1333;0.1722;0.3333;0.3722;0.4667;0.5111;1.0000"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.0933;0.0944;0.5111;0.5500;1.0000"/></g>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c3)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">+1</text><animateTransform attributeName="transform" type="translate" dur="9.0s" repeatCount="indefinite" values="70.0 205.0;70.0 205.0;270.0 145.0;380.0 145.0;380.0 145.0;450.0 145.0;450.0 145.0;520.0 145.0;520.0 145.0;720.0 180.0;720.0 180.0" keyTimes="0.0000;0.1444;0.1833;0.2222;0.3333;0.3722;0.4667;0.5056;0.6000;0.6444;1.0000"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.1433;0.1444;0.6444;0.6833;1.0000"/></g>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c4)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">+1</text><animateTransform attributeName="transform" type="translate" dur="9.0s" repeatCount="indefinite" values="70.0 85.0;70.0 85.0;270.0 145.0;310.0 145.0;310.0 145.0;380.0 145.0;380.0 145.0;450.0 145.0;450.0 145.0;520.0 145.0;520.0 145.0;720.0 180.0;720.0 180.0" keyTimes="0.0000;0.1944;0.2333;0.2722;0.3333;0.3722;0.4667;0.5056;0.6000;0.6389;0.7333;0.7778;1.0000"/><animate attributeName="opacity" dur="9.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.1933;0.1944;0.7778;0.8167;1.0000"/></g>
+</svg>

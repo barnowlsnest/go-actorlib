@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="330" viewBox="0 0 860 330" role="img" aria-label="Animation: a supervisor restarts a child actor after it panics">
+<title>Animation: a supervisor restarts a child actor after it panics</title>
+
+<style>
+  :root{--bg:#ffffff;--panel:#f6f8fa;--border:#d0d7de;--fg:#1f2328;--muted:#59636e;
+        --accent:#0969da;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;
+        --c1:#0969da;--c2:#8250df;--c3:#bf3989;--c4:#1a7f37;}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--muted:#9198a1;
+          --accent:#4493f8;--ok:#3fb950;--bad:#f85149;--warn:#d29922;
+          --c1:#4493f8;--c2:#a371f7;--c3:#db61a2;--c4:#3fb950;}
+  }
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .bg{fill:var(--bg);stroke:var(--border)}
+  .panel{fill:var(--panel);stroke:var(--border);stroke-width:1.5}
+  .muted{fill:var(--muted)}
+  .title{font-size:16px;font-weight:600}
+  .small{font-size:12px}
+  .tiny{font-size:11px}
+  .slot{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 3}
+  .edge{fill:none;stroke:var(--border);stroke-width:1.5}
+  .chiptext{font-size:12px;font-weight:600;fill:#ffffff}
+  .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .accent{fill:var(--accent)}
+  .okS{stroke:var(--ok)} .badS{stroke:var(--bad)} .accentS{stroke:var(--accent)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="859" height="329" rx="12"/>
+<text class="title" x="24" y="34">Supervision: failed children are restarted (OneForOne)</text>
+<text class="small muted" x="24" y="54">A panic is terminal for the actor; Done() closes, the supervisor notices and starts a fresh instance.</text>
+<rect class="panel" x="330" y="75" width="200" height="60" rx="10"/>
+<text class="title mono" x="430.0" y="101" text-anchor="middle">Supervisor</text>
+<text class="tiny muted" x="430.0" y="120" text-anchor="middle">max 3 restarts / 5s</text>
+<path class="edge" d="M430.0 135 C 430.0 165, 140 160, 140 190"/>
+<rect class="panel" x="45.0" y="190" width="190" height="80" rx="10"/>
+<text class="title mono" x="140" y="218" text-anchor="middle">worker-1</text>
+<circle cx="102" cy="242" r="5" class="ok"/>
+<text class="small" x="112" y="246">Started</text>
+<path class="edge" d="M430.0 135 C 430.0 165, 430 160, 430 190"/>
+<g><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="1;1;0;0;0;1" keyTimes="0.0000;0.4000;0.4625;0.9375;0.9988;1.0000"/><rect class="panel" x="335.0" y="190" width="190" height="80" rx="10"/><rect x="335.0" y="190" width="190" height="80" rx="10" fill="none" class="badS" stroke-width="3" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.2487;0.2500;0.4625;0.4637;1.0000"/></rect><text class="title mono" x="430" y="218" text-anchor="middle">worker-2</text><g><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="1;1;0;0;1" keyTimes="0.0000;0.2487;0.2500;0.9988;1.0000"/><circle cx="392" cy="242" r="5" class="ok"/><text class="small" x="402" y="246">Started</text></g><g opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.2487;0.2500;0.4625;0.4637;1.0000"/><circle cx="388" cy="242" r="5" class="bad"/><text class="small bad" x="398" y="246" font-weight="600">Panicked</text></g></g>
+<text class="small mono bad" x="430" y="292" text-anchor="middle" opacity="0">panic: nil map write<animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.2487;0.2500;0.4000;0.4375;1.0000"/></text>
+<circle r="6" class="accent" opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.4250;0.4375;0.5500;0.5625;1.0000"/><animateMotion dur="8.0s" repeatCount="indefinite" path="M430.0 135 C 430.0 165, 430 160, 430 190" keyPoints="0;0;1;1" keyTimes="0;0.4375;0.5500;1" calcMode="linear"/></circle>
+<g opacity="0"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0" keyTimes="0.0000;0.5488;0.6000;0.9375;1.0000"/><rect class="panel" x="335.0" y="190" width="190" height="80" rx="10"/><rect x="335.0" y="190" width="190" height="80" rx="10" fill="none" class="okS" stroke-width="3"/><text class="title mono" x="430" y="218" text-anchor="middle">worker-2</text><circle cx="378" cy="242" r="5" class="ok"/><text class="small" x="388" y="246">Started (restart 1/3)</text></g>
+<text class="tiny muted" x="546" y="157" opacity="0">death watch: Done() closed → restart<animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.4250;0.4375;0.5875;0.6125;1.0000"/></text>
+<path class="edge" d="M430.0 135 C 430.0 165, 720 160, 720 190"/>
+<rect class="panel" x="625.0" y="190" width="190" height="80" rx="10"/>
+<text class="title mono" x="720" y="218" text-anchor="middle">worker-3</text>
+<circle cx="682" cy="242" r="5" class="ok"/>
+<text class="small" x="692" y="246">Started</text>
+<text class="tiny muted" x="24" y="316">Siblings keep running. A clean Stop (state Done) is not restarted; AllForOne restarts every child.</text>
+</svg>

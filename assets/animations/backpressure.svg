@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="280" viewBox="0 0 860 280" role="img" aria-label="Animation: a full mailbox blocks the sender until the receive timeout expires">
+<title>Animation: a full mailbox blocks the sender until the receive timeout expires</title>
+
+<style>
+  :root{--bg:#ffffff;--panel:#f6f8fa;--border:#d0d7de;--fg:#1f2328;--muted:#59636e;
+        --accent:#0969da;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;
+        --c1:#0969da;--c2:#8250df;--c3:#bf3989;--c4:#1a7f37;}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--muted:#9198a1;
+          --accent:#4493f8;--ok:#3fb950;--bad:#f85149;--warn:#d29922;
+          --c1:#4493f8;--c2:#a371f7;--c3:#db61a2;--c4:#3fb950;}
+  }
+  text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;fill:var(--fg)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .bg{fill:var(--bg);stroke:var(--border)}
+  .panel{fill:var(--panel);stroke:var(--border);stroke-width:1.5}
+  .muted{fill:var(--muted)}
+  .title{font-size:16px;font-weight:600}
+  .small{font-size:12px}
+  .tiny{font-size:11px}
+  .slot{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 3}
+  .edge{fill:none;stroke:var(--border);stroke-width:1.5}
+  .chiptext{font-size:12px;font-weight:600;fill:#ffffff}
+  .ok{fill:var(--ok)} .bad{fill:var(--bad)} .warn{fill:var(--warn)} .accent{fill:var(--accent)}
+  .okS{stroke:var(--ok)} .badS{stroke:var(--bad)} .accentS{stroke:var(--accent)}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="859" height="279" rx="12"/>
+<text class="title" x="24" y="34">Backpressure: a full mailbox makes senders wait</text>
+<text class="small muted" x="24" y="54">If the actor falls behind, Send blocks up to the receive timeout, then fails with ErrActorReceiveTimeout.</text>
+<rect class="panel" x="272" y="122" width="286" height="56" rx="8"/>
+<rect class="slot" x="489" y="132" width="62" height="36" rx="6"/>
+<g transform="translate(520 150)"><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c1)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text></g>
+<rect class="slot" x="419" y="132" width="62" height="36" rx="6"/>
+<g transform="translate(450 150)"><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c2)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text></g>
+<rect class="slot" x="349" y="132" width="62" height="36" rx="6"/>
+<g transform="translate(380 150)"><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c3)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text></g>
+<rect class="slot" x="279" y="132" width="62" height="36" rx="6"/>
+<g transform="translate(310 150)"><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--c4)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text></g>
+<text class="tiny warn" x="415" y="196" text-anchor="middle" font-weight="600">mailbox full (4/4)</text>
+<path class="edge" d="M558 150 L610 150"/>
+<rect class="panel" x="610" y="75" width="220" height="150" rx="10"/><text class="title mono" x="624" y="99">Actor[World]</text><text class="small muted" x="624" y="119">busy with a slow command</text><text class="small muted" x="624" y="136"></text>
+<g transform="translate(720.0 185)"><circle r="14" fill="none" style="stroke:var(--border)" stroke-width="4"/><path d="M0 -14 A14 14 0 0 1 14 0" fill="none" class="accentS" stroke-width="4" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1s" repeatCount="indefinite"/></path></g>
+<circle cx="70" cy="150" r="16" class="panel"/><text class="tiny muted" x="70" y="154" text-anchor="middle">g1</text>
+<text class="tiny muted" x="70" y="186" text-anchor="middle">ref.Send(ctx, cmd)</text>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--accent)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text><animateTransform attributeName="transform" type="translate" dur="8.0s" repeatCount="indefinite" values="100.0 150.0;100.0 150.0;215.0 150.0;215.0 150.0;215.0 220.0;215.0 220.0" keyTimes="0.0000;0.0375;0.1250;0.6250;0.7250;1.0000"/><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.0362;0.0375;0.6875;0.7250;1.0000"/></g>
+<g><rect x="-28.0" y="-13.0" width="56" height="26" rx="6" style="fill:var(--bad)"/><text class="chiptext mono" x="0" y="4" text-anchor="middle">cmd</text><animateTransform attributeName="transform" type="translate" dur="8.0s" repeatCount="indefinite" values="100.0 150.0;100.0 150.0;215.0 150.0;215.0 150.0;215.0 220.0;215.0 220.0" keyTimes="0.0000;0.0375;0.1250;0.6250;0.7250;1.0000"/><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6238;0.6250;0.6875;0.7250;1.0000"/></g>
+<g transform="translate(215 98)"><animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.1237;0.1250;0.6238;0.6250;1.0000"/><circle r="22" fill="none" style="stroke:var(--border)" stroke-width="4"/><circle r="22" fill="none" class="badS" stroke-width="4" transform="rotate(-90)" stroke-dasharray="138.2" stroke-dashoffset="138.2"><animate attributeName="stroke-dashoffset" dur="8.0s" repeatCount="indefinite" values="138.2;138.2;0;0" keyTimes="0.0000;0.1250;0.6250;1.0000"/></circle><text class="tiny muted" x="0" y="4" text-anchor="middle">wait</text></g>
+<text class="tiny muted" x="215" y="186" text-anchor="middle" opacity="0">blocked (receiveTimeout)<animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.1237;0.1250;0.6238;0.6250;1.0000"/></text>
+<text class="small mono bad" x="215" y="102" text-anchor="middle" font-weight="600" opacity="0">ErrActorReceiveTimeout<animate attributeName="opacity" dur="8.0s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0.0000;0.6238;0.6250;0.9500;0.9750;1.0000"/></text>
+<text class="tiny muted" x="24" y="262">Tune with actor.WithInputBufferSize and actor.WithReceiveTimeout, or route failures to a dead-letter queue.</text>
+</svg>
