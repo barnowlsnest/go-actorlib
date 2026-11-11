@@ -8,7 +8,7 @@ participant "Sender" as sender
 participant "Ref<T>" as ref
 participant "Actor Goroutine" as actor
 participant "BehaviorStack" as stack
-participant "GoActorContext" as actx
+participant "ActorContext" as actx
 
 == Initial State ==
 
@@ -32,9 +32,9 @@ actor -> stack : Current()
 stack --> actor : initialHandler
 actor -> actor : initialHandler(ctx, msg2, entity)
 
-note right of actor : Inside handler, actor retrieves\nGoActorContext from context.Context
+note right of actor : Inside handler, actor retrieves\nActorContext from context.Context
 
-actor -> actx : GetGoActorContext[T](ctx)
+actor -> actx : GetActorContext[T](ctx)
 actx --> actor : actorContext
 actor -> actx : Become(authHandler)
 actx -> stack : Become(authHandler)
@@ -108,7 +108,7 @@ end note
 note over actor, stack
   **Key Properties:**
   • BehaviorStack is only accessed from within the actor's goroutine (no sync needed)
-  • GoActorContext is injected via context.WithValue at Start()
+  • ActorContext is injected via context.WithValue at Start()
   • Become pushes (preserves previous), BecomeReplace swaps top (discards previous)
   • Unbecome pops to restore previous; returns false at base
   • Middleware wraps the current behavior — chain is applied once at startup

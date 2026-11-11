@@ -33,10 +33,13 @@ func (s *ActorSystem) OnEvent(handler EventHandler) {
 
 // emitEvent notifies all registered event handlers.
 // Handlers are called synchronously in registration order.
+//
+// eventHandlers is append-only (OnEvent never rewrites an existing element), so
+// the slice header read under the lock remains a valid snapshot after it is
+// released; copying it allocated once per event beyond ~4 handlers.
 func (s *ActorSystem) emitEvent(event Event) {
 	s.mu.RLock()
-	handlers := make([]EventHandler, len(s.eventHandlers))
-	copy(handlers, s.eventHandlers)
+	handlers := s.eventHandlers
 	s.mu.RUnlock()
 
 	for _, h := range handlers {

@@ -2,7 +2,7 @@
 
 A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model) library for Go. Actors run on native goroutines and channels — no extra runtime, no shared mutable state.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/go-actorlib/v5.svg)](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5)
+[![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/go-actorlib/v6.svg)](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/barnowlsnest/go-actorlib)](go.mod)
 [![Build](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml)
 [![Lint](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml)
@@ -12,17 +12,17 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 
 - **Type-safe** — generics bind entities, commands, and refs at compile time
 - **Lightweight** — one actor is one goroutine plus a bounded channel
-- **ActorRef** — immutable proxy: `Send`, `Stop`, `State`, `Done`
-- **Command & Ask** — async result channels, or single-call request/response
-- **Actor System** — name registry, `Spawn`, typed `Send`/`Ask`, event bus, LIFO shutdown
+- **ActorRef** — immutable proxy: `Send`, `Ask`, `Stop`, `State`, `Done`
+- **Command & Ask** — async result channels, or single-call request/response via `ref.Ask` / `sys.Ask`
+- **Actor System** — name registry; `Spawn`, typed `Send`/`Ask` as generic methods; event bus, LIFO shutdown
 - **Supervision** — OneForOne / AllForOne, death watch, restart-frequency limits
-- **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `GoActorContext`
+- **Behavior change** — `Become` / `BecomeReplace` / `Unbecome` via `ActorContext`
 - **Middleware** — logging, metrics, and panic recovery (`go-logslib`)
 - **Dead letters** — queue for undeliverable messages with handlers
-- **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `GoActor`)
+- **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `Actor`)
 - **Signals** — SIGTERM / SIGINT graceful shutdown
 - **Panic recovery** — panics become errors; a panicked actor terminates cleanly (`Done()` closes) so supervisors can restart it
-- **Dropped commands are canceled** — `GoCommand`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
+- **Dropped commands are canceled** — `Command`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
 - **Race-tested** — the suite runs with the `-race` detector
 
 ## Why an actor library in Go?
@@ -61,7 +61,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 ## Installation
 
 ```bash
-go get github.com/barnowlsnest/go-actorlib/v5
+go get github.com/barnowlsnest/go-actorlib/v6
 ```
 
 Requires **Go 1.27** or later.
@@ -79,9 +79,8 @@ import (
     "log"
     "time"
 
-    "github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
-    "github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
-    "github.com/barnowlsnest/go-actorlib/v5/pkg/ask"
+    "github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
+    "github.com/barnowlsnest/go-actorlib/v6/pkg/actorref"
 )
 
 type Counter struct{ Value int }
@@ -97,7 +96,7 @@ func main() {
 
     a, err := actor.StartNew(ctx, 5*time.Second,
         actor.WithProvider(&CounterProvider{&Counter{}}),
-        actor.WithName[*Counter]("counter"),
+        actor.WithName[Counter]("counter"),
     )
     if err != nil {
         log.Fatal(err)
@@ -109,7 +108,7 @@ func main() {
     }
     defer ref.Stop(5 * time.Second)
 
-    n, err := ask.New(ctx, ref, func(c *Counter) (int, error) {
+    n, err := ref.Ask(ctx, func(c *Counter) (int, error) {
         c.Value++
         return c.Value, nil
     }, 5*time.Second)
@@ -120,12 +119,14 @@ func main() {
 }
 ```
 
-Defaults: input buffer size `1`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ask.New` for request/response; use commands when you need async `Done()` / `Error()`.
+Type parameters name the entity's base type — `actor.Actor[Counter]`, `actor.WithName[Counter]` — while the actor always manages a `*Counter`: commands, handlers, and providers receive or return `*Counter`. `actor.New`, `actor.StartNew`, and `ActorSystem.Spawn` check at compile time that `*Counter` implements `actor.Entity`.
+
+Defaults: input buffer size `16`, receive timeout `5s`. A receive timeout of `0` waits indefinitely (still respects `ctx`). Prefer `ref.Ask` for request/response; use commands when you need async `Done()` / `Error()`.
 
 ### Commands
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+import "github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 
 cmd := command.New(func(counter *Counter) (int, error) {
     counter.Value++
@@ -144,7 +145,7 @@ fmt.Printf("Counter value: %d\n", result)
 return cmd.Error()
 ```
 
-A `GoCommand` runs at most once — sending the same command twice executes it once. When it does not succeed, `Done()` closes without a value and `Error()` explains why:
+A `Command` runs at most once — sending the same command twice executes it once. When it does not succeed, `Done()` closes without a value and `Error()` explains why:
 
 | Outcome | `State()` | `Error()` |
 |---|---|---|
@@ -162,8 +163,8 @@ Custom `Executable` types can implement `actor.Cancelable` (`Cancel(err error)`)
 ```go
 myActor, err := actor.New(
     actor.WithProvider(&CounterProvider{&Counter{}}),
-    actor.WithInputBufferSize[*Counter](10),
-    actor.WithReceiveTimeout[*Counter](5*time.Second),
+    actor.WithInputBufferSize[Counter](10),
+    actor.WithReceiveTimeout[Counter](5*time.Second),
 )
 if err != nil {
     log.Fatal(err)
@@ -180,30 +181,30 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
 
 - **Start once.** `Start` succeeds at most once; concurrent or repeated calls return `ErrActorAlreadyStarted`. A `Start` that fails validation (`ErrActorNilEntity`) may be retried.
 - **Panics are terminal.** A panic recovered from a handler or the `AfterStart` hook moves the actor to `Panicked` and ends its goroutine; `Done()` closes. Use the `Recovery` middleware to keep the actor alive instead.
-- **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `GoCommand` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
+- **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `Command` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
 - **Stop errors.** `Stop` returns `ErrActorGracefulStopTimeout` if the actor does not finish within the timeout (state `StoppedWithError`), and an error wrapping `ErrActorNotRunning` if the actor is not `Started` (never started, already stopping, or terminated). `system.StopAll` and `supervision.Supervisor.StopAll` treat `ErrActorNotRunning` as already stopped once the actor has actually exited (`Done()` closed), waiting up to their timeout for it.
 
 ### Actor system
 
 `Spawn` is `New` + `Start` + `WaitReady` + `actorref.New` + `Register`. It applies `WithName` from the registry name. Failed registration stops the actor so nothing is left running unregistered.
 
-`Register`, `Send`, and `Ask` are generic free functions.
+`Spawn`, `Register`, `Send`, and `Ask` are generic methods on `*ActorSystem` (Go 1.27 generic methods); type arguments are inferred from the provider, command, or delegate.
 
 ```go
 sys := system.New()
 
-ref, err := system.Spawn(sys, ctx, "counter-1",
+ref, err := sys.Spawn(ctx, "counter-1",
     &CounterProvider{&Counter{}},
     5*time.Second,
-    actor.WithInputBufferSize[*Counter](10),
+    actor.WithInputBufferSize[Counter](10),
 )
 if err != nil {
     log.Fatal(err)
 }
 
-_ = system.Send(sys, ctx, "counter-1", cmd)
+_ = sys.Send(ctx, "counter-1", cmd)
 
-result, err := system.Ask(sys, ctx, "counter-1", func(c *Counter) (int, error) {
+result, err := sys.Ask(ctx, "counter-1", func(c *Counter) (int, error) {
     c.Value++
     return c.Value, nil
 }, 5*time.Second)
@@ -264,18 +265,18 @@ func (s *MyChildSpec) Start(ctx context.Context) (supervision.ChildRef, error) {
 ### Behavior change
 
 ```go
-func initialHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
+func initialHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[*MyEntity](ctx).Become(authenticatedHandler)
+    actor.GetActorContext[MyEntity](ctx).Become(authenticatedHandler)
 }
 
-func authenticatedHandler(ctx context.Context, e actor.Executable[*MyEntity], entity *MyEntity) {
+func authenticatedHandler(ctx context.Context, e actor.Executable[MyEntity], entity *MyEntity) {
     e.Execute(ctx, entity)
-    actor.GetGoActorContext[*MyEntity](ctx).Unbecome()
+    actor.GetActorContext[MyEntity](ctx).Unbecome()
 }
 ```
 
-`GoActorContext` is valid only while the current message is processed. `Unbecome` will not pop the base handler.
+`ActorContext` is valid only while the current message is processed. `Unbecome` will not pop the base handler.
 
 ### Middleware
 
@@ -287,11 +288,11 @@ log := logger.New(logger.Config{Level: logger.DebugLevel})
 
 myActor, err := actor.StartNew(ctx, 5*time.Second,
     actor.WithProvider(provider),
-    actor.WithName[*Counter]("counter"),
+    actor.WithName[Counter]("counter"),
     actor.WithMiddleware(
-        middleware.Recovery[*Counter](log),
-        middleware.Logging[*Counter](log),
-        middleware.MetricsMiddleware[*Counter](metrics),
+        middleware.Recovery[Counter](log),
+        middleware.Logging[Counter](log),
+        middleware.MetricsMiddleware[Counter](metrics),
     ),
 )
 ```
@@ -325,10 +326,10 @@ sys.StopAll(10 * time.Second)
 
 ### Priority mailbox
 
-Standalone heap — not plugged into `GoActor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
+Standalone heap — not plugged into `Actor`. Priority (highest first): `System` > `High` > `Normal` > `Low`. FIFO within a level. `Push` returns `false` when full or closed.
 
 ```go
-mb := mailbox.NewPriority[*MyEntity](100)
+mb := mailbox.NewPriority[MyEntity](100)
 
 mb.Push(normalCmd, mailbox.Normal)
 mb.Push(systemCmd, mailbox.System) // processed first
@@ -341,22 +342,22 @@ msg, ok := mb.Pop() // systemCmd
 
 | Package | Description |
 |---|---|
-| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actor) | `GoActor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
-| [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actorref) | Typed `Ref`: `Send`, `Stop`, `State`, `Done` |
-| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/command) | `GoCommand` with `DelegateFn` and a result channel |
-| [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/ask) | Request/response with timeout |
-| [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/system) | Name registry, `Spawn`, `Register`/`Send`/`Ask`, event bus |
-| [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
-| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
-| [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/deadletter) | Dead-letter queue with capacity and handlers |
-| [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
-| [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/mailbox) | Standalone priority mailbox |
+| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `ActorContext`, middleware, `StartNew` |
+| [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actorref) | Typed `Ref`: `Send`, `Ask`, `Stop`, `State`, `Done` |
+| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/command) | `Command` with `DelegateFn` and a result channel |
+| [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/ask) | `Await` (shared wait behind `Ref.Ask` / `ActorSystem.Ask`), `ErrAskTimeout` |
+| [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/system) | Name registry; `Spawn`, `Register`/`Send`/`Ask` methods; event bus |
+| [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
+| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
+| [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/deadletter) | Dead-letter queue with capacity and handlers |
+| [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
+| [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/mailbox) | Standalone priority mailbox |
 
 PlantUML diagrams: [`docs/`](./docs/README.md).
 
 ## Performance notes
 
-- Tune the input buffer (default `1`) and receive timeout for backpressure; always `Stop` / `StopAll` to avoid leaked goroutines.
+- Tune the input buffer (default `16`) and receive timeout for backpressure; always `Stop` / `StopAll` to avoid leaked goroutines.
 - Middleware is composed once at startup; supervisor restart-frequency limits prevent restart storms.
 
 ## Development

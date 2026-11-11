@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // Metrics collects message processing statistics for an actor.
@@ -44,12 +44,12 @@ func (m *Metrics) AverageDuration() time.Duration {
 //	metrics := &middleware.Metrics{}
 //	actor.New(
 //		actor.WithProvider(provider),
-//		actor.WithMiddleware(middleware.MetricsMiddleware[*MyEntity](metrics)),
+//		actor.WithMiddleware(middleware.MetricsMiddleware[MyEntity](metrics)),
 //	)
 //	// Later: metrics.MessageCount(), metrics.AverageDuration()
-func MetricsMiddleware[T actor.Entity](m *Metrics) actor.Middleware[T] {
+func MetricsMiddleware[T any](m *Metrics) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
-		return func(ctx context.Context, e actor.Executable[T], entity T) {
+		return func(ctx context.Context, e actor.Executable[T], entity *T) {
 			start := time.Now()
 			next(ctx, e, entity)
 			duration := time.Since(start)

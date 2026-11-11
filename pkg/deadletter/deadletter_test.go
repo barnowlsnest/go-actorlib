@@ -1,7 +1,9 @@
 package deadletter
 
 import (
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -114,4 +116,62 @@ func (s *DeadLetterTestSuite) TestNew_WithNegativeCapacity_ShouldBehaveLikeZero(
 
 	s.NotPanics(func() { q.Publish(Letter{Target: "a"}) })
 	s.Equal(0, q.Count())
+}
+
+func (s *DeadLetterTestSuite) TestPublish_AcrossManyWrapsAndClears_ShouldMatchSliceModel() {
+	for _, capacity := range []int{1, 2, 3, 7, 16} {
+		// Arrange - model: keep the last `capacity` letters, oldest first
+		q := New(WithCapacity(capacity))
+		var model []Letter
+
+		// Act + Assert - check after every operation, through several wraps
+		for i := range 5*capacity + 3 {
+			if i == 2*capacity+1 { // clear mid-way, after the ring has wrapped
+				q.Clear()
+				model = nil
+			}
+
+			l := Letter{Target: "t" + strconv.Itoa(i), Reason: "r"}
+			q.Publish(l)
+			model = append(model, l)
+			if len(model) > capacity {
+				model = model[1:]
+			}
+
+			s.Equal(len(model), q.Count(), "capacity=%d step=%d", capacity, i)
+			s.Equal(model, q.Letters(), "capacity=%d step=%d", capacity, i)
+		}
+	}
+}
+
+func (s *DeadLetterTestSuite) TestClear_ShouldReleaseRetainedLetters() {
+	q := New(WithCapacity(3))
+	for i := range 5 {
+		q.Publish(Letter{Target: "t" + strconv.Itoa(i)})
+	}
+
+	q.Clear()
+
+	s.Equal(make([]Letter, 3), q.letters, "Clear must drop references held by the ring")
+}
+
+func (s *DeadLetterTestSuite) TestOnDeadLetter_ConcurrentWithPublish_ShouldBeSafe() {
+	// Arrange - Publish iterates a handler snapshot without copying it, while
+	// OnDeadLetter appends; run under -race.
+	q := New(WithCapacity(8))
+	var calls atomic.Int64
+	var wg sync.WaitGroup
+
+	// Act
+	for range 50 {
+		wg.Go(func() { q.OnDeadLetter(func(Letter) { calls.Add(1) }) })
+		wg.Go(func() { q.Publish(Letter{Target: "a"}) })
+	}
+	wg.Wait()
+
+	calls.Store(0)
+	q.Publish(Letter{Target: "b"})
+
+	// Assert - every handler is registered exactly once
+	s.Equal(int64(50), calls.Load())
 }

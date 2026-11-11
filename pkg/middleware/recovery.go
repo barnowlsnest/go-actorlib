@@ -6,7 +6,7 @@ import (
 
 	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // Recovery returns a middleware that recovers from panics in downstream handlers.
@@ -20,15 +20,15 @@ import (
 //	log := logger.New(logger.Config{Level: logger.ErrorLevel})
 //	actor.New(
 //		actor.WithProvider(provider),
-//		actor.WithMiddleware(middleware.Recovery[*MyEntity](log)),
+//		actor.WithMiddleware(middleware.Recovery[MyEntity](log)),
 //	)
-func Recovery[T actor.Entity](log *logger.Logger) actor.Middleware[T] {
+func Recovery[T any](log *logger.Logger) actor.Middleware[T] {
 	return func(next actor.HandlerFunc[T]) actor.HandlerFunc[T] {
-		return func(ctx context.Context, e actor.Executable[T], entity T) {
+		return func(ctx context.Context, e actor.Executable[T], entity *T) {
 			defer func() {
 				if r := recover(); r != nil {
 					actorName := ""
-					if ac := actor.GetGoActorContext[T](ctx); ac != nil {
+					if ac := actor.GetActorContext[T](ctx); ac != nil {
 						actorName = ac.Name()
 					}
 

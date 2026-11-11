@@ -11,11 +11,11 @@ package "Client Application" as client {
 }
 
 package "pkg/actor" as actor_pkg {
-  component [GoActor<T>] as actor
+  component [Actor<T>] as actor
   component [EntityProvider<T>] as provider
   component [Hooks] as hooks
   component [BehaviorStack<T>] as behavior
-  component [GoActorContext<T>] as actorctx
+  component [ActorContext<T>] as actorctx
   component [Middleware<T>] as mw
   interface "Entity" as entity
   interface "Executable<T>" as executable
@@ -26,12 +26,12 @@ package "pkg/actorref" as ref_pkg {
 }
 
 package "pkg/command" as command_pkg {
-  component [GoCommand<E,R>] as command
+  component [Command<E,R>] as command
   component [DelegateFn<E,R>] as delegate
 }
 
 package "pkg/ask" as ask_pkg {
-  component [ask.New<E,R>] as ask
+  component [ask.Await<E,R>] as ask
 }
 
 package "pkg/system" as system_pkg {
@@ -66,7 +66,7 @@ package "pkg/mailbox" as mailbox_pkg {
 
 ' Client relationships
 user --> ref : sends commands via
-user --> ask : request/response
+user --> ref : request/response (Ref.Ask)
 user --> system : registers actors
 user --> supervisor : manages lifecycles
 user --> signal : graceful shutdown
@@ -87,8 +87,8 @@ command --> delegate : executes function
 delegate --> entity : operates on
 
 ' Ask uses Ref
-ask --> ref : sends command via
-ask --> command : creates and awaits
+ref --> ask : Ask waits via
+ask --> command : awaits
 
 ' System relationships
 system --> ref : manages refs

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-go-actorlib is a lightweight, type-safe Actor Model library for Go built on native concurrency primitives (goroutines and channels). Module: `github.com/barnowlsnest/go-actorlib/v5`, requires Go 1.27. License: MIT.
+go-actorlib is a lightweight, type-safe Actor Model library for Go built on native concurrency primitives (goroutines and channels). Module: `github.com/barnowlsnest/go-actorlib/v6`, requires Go 1.27. License: MIT.
 
 ## Commands
 
@@ -38,13 +38,14 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/actor` — Core actor implementation
 
-- **`GoActor[T Entity]`** — Generic actor that manages an entity of type T in an isolated goroutine. Processes `Executable[T]` commands sequentially from a bounded input channel.
-- **`Entity`** — `IsProvidable() bool`.
-- **`Executable[T Entity]`** — Commands sent via `Receive()`.
-- **`EntityProvider[T]`** — `Provide() T`; required at construction (`ErrActorNilProvider`).
+- **`Actor[T any]`** — Generic actor that manages an entity of type `*T` in an isolated goroutine. `T` is the entity's base type: `Actor[Counter]`, `WithName[Counter]`, never `[*Counter]`. Processes `Executable[T]` commands sequentially from a bounded input channel.
+- **`Entity`** — `IsProvidable() bool`, implemented by `*T`.
+- **`EntityPtr[T]`** — `interface{ *T; Entity }`. `New`, `StartNew`, and `ActorSystem.Spawn` take a trailing `PT EntityPtr[T]`, inferred from `T`, to require at compile time that `*T` implements `Entity`; `New` binds `PT(e).IsProvidable()` into a closure so `Actor[T]` keeps one type parameter. Every other generic in the module is `[T any]`.
+- **`Executable[T any]`** — `Execute(ctx, *T)`; commands sent via `Receive()`.
+- **`EntityProvider[T]`** — `Provide() *T`; required at construction (`ErrActorNilProvider`).
 - **`Hooks`** — BeforeStart, AfterStart, BeforeStop, AfterStop, OnError. Default is `noopHooks`.
 - **`BehaviorStack[T]`** — Stack of `HandlerFunc[T]`. `Become` (push), `BecomeReplace` (swap top), `Unbecome` (pop; cannot pop the base handler). Goroutine-local; no synchronization.
-- **`GoActorContext[T]`** — Injected into the message `context.Context` at start. `GetGoActorContext[T](ctx)` returns nil outside a handler. Valid only for the current message. Exposes `Become`, `BecomeReplace`, `Unbecome`, `Name`.
+- **`ActorContext[T]`** — Injected into the message `context.Context` at start. `GetActorContext[T](ctx)` returns nil outside a handler. Valid only for the current message. Exposes `Become`, `BecomeReplace`, `Unbecome`, `Name`.
 - **`StartNew[T]`** — `New` + `Start` + `WaitReady`.
 - **Middleware** — `Middleware[T]` wraps `HandlerFunc[T]`. `Chain` folds right-to-left (A, B, C → A then B then C then handler). `WithMiddleware` **appends**; composed once in `Start()`. Empty chain calls `Execute` directly.
 - **State machine** (7 states via `sync/atomic`): Initialized → Started → Stopping → Done / StoppedWithError / Canceled / Panicked.
@@ -52,38 +53,39 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 - **Stop** uses atomic CAS (`CompareAndSwapUint64`); a dedicated `stop` channel signals shutdown. Returns `ErrActorGracefulStopTimeout` on timeout (state StoppedWithError), or an error wrapping `ErrActorNotRunning` (with the state name) if not Started.
 - **Panics are terminal** — a panic recovered from a handler or `AfterStart` sets Panicked and the loop exits, so `Done()` closes (supervisors depend on this).
 - **Drain on exit** — on any loop exit (stop, ctx, panic) a deferred `drain()` closes `exiting` (wakes blocked senders), takes `sendMu` write lock and sets `closed`, then empties `input`, calling `Cancel(ErrActorCommandDropped)` on every `Cancelable`; non-`Cancelable` executables are discarded silently. `Receive` holds `sendMu` read lock for the send, so every accepted command is either executed or drained — none is left in the mailbox after exit.
-- **`Cancelable`** — optional `Cancel(err error)` on executables; `GoCommand` implements it. `Cancel` runs on the actor goroutine **before** `Done()` closes (so a closed `Done` means every accepted command was executed or canceled); it must not block, especially not on the actor's own `Done()`. Re-entrant `Receive`/`Stop` from `Cancel` return errors (state is no longer Started, checked before `sendMu`). Panics are recovered per command and reported via `OnError`. Contract tests: `pkg/actor/cancel_contract_test.go`.
-- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started or after the loop has exited (`ErrActorReceiveOnStopped`). Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
-- Defaults: `inputBufSize = 1`, `receiveTimeout = 5s`.
+- **`Cancelable`** — optional `Cancel(err error)` on executables; `Command` implements it. `Cancel` runs on the actor goroutine **before** `Done()` closes (so a closed `Done` means every accepted command was executed or canceled); it must not block, especially not on the actor's own `Done()`. Re-entrant `Receive`/`Stop` from `Cancel` return errors (state is no longer Started, checked before `sendMu`). Panics are recovered per command and reported via `OnError`. Contract tests: `pkg/actor/cancel_contract_test.go`.
+- **Receive** rejects nil commands, `Initialized` (`ErrActorNotStarted`), and any state after Started or after the loop has exited (`ErrActorReceiveOnStopped`). A done `ctx` fails fast with `ctx.Err()`, even when the mailbox has room. If the mailbox has room the send is non-blocking and arms no timer; only a full mailbox falls back to the timed `select`. Timeout `0` skips the timer and still honors `ctx`. `ErrActorReceiveTimeout` when the buffer is full and the timeout elapses.
+- Defaults: `inputBufSize = 16`, `receiveTimeout = 5s`.
 - Options: `WithProvider`, `WithInputBufferSize`, `WithReceiveTimeout`, `WithHooks`, `WithName`, `WithMiddleware`.
 - Also: `Name()`, `Done()`, `InputBufferSize()`, `CheckState`, `State`.
 
 ### `pkg/actorref` — Typed actor handle (proxy)
 
-- **`Ref[T Entity]`** — Immutable proxy (`actor` field unexported). `Send`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
-- **`New[T](a *GoActor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
+- **`Ref[T any]`** — Immutable proxy (`actor` field unexported). `Send`, `Ask`, `Stop`, `State`, `Done`. Hides `Start`, `WaitReady`, `CheckState`.
+- **`New[T](a *Actor[T]) (*Ref[T], error)`** — `ErrActorRefNilActor` if `a` is nil.
+- **`Ask[R any](ctx, DelegateFn[T, R], timeout)`** — generic method: `command.New` + `Send` + `ask.Await`.
 - Safe for concurrent use; multiple refs can point to the same actor. `Send` delegates to `Receive`.
 
 ### `pkg/command` — Command pattern for async operations
 
-- **`GoCommand[E Entity, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
+- **`Command[E, R any]`** — Wraps `DelegateFn[E, R]` (`func(entity *E) (R, error)`) as `Executable[E]`. Buffered result channel (`Done()`, cap 1).
 - **State machine** (6 states via `sync.Mutex`): Created → Started → Finished / Failed / Canceled / Panic.
 - **Runs at most once** — `Execute` moves Created → Started under the mutex; repeat calls, or Execute after `Cancel`, are no-ops.
 - **`Cancel(err)`** — Created → Canceled, closes `Done()`; no-op once started (implements `actor.Cancelable`).
 - Terminal state/error are recorded **before** the result is sent, so a receiver sees the final `State()`.
 - On success: one value on `Done()`, then close. On failure/cancel/panic: close without a value; inspect `Error()`. Panic error is `errors.Join(ErrCommandPanic, <panic value>)` — compare with `errors.Is`.
 
-### `pkg/ask` — Ask pattern (request/response convenience)
+### `pkg/ask` — Shared request/response wait
 
-- **`New[E Entity, R any](ctx, *actorref.Ref[E], DelegateFn, timeout)`** — Command + `Send` + wait. Accepts `*actorref.Ref[E]`, not `*GoActor[E]`.
+- **`Await[E, R any](ctx, *command.Command[E, R], timeout)`** — waits for a command result; used by `Ref.Ask` and `ActorSystem.Ask`. Imports only `command` (`actorref` imports `ask`, not the reverse).
 - **`ErrAskTimeout`** — Result not received within timeout. Also returns `ctx.Err()` if the context is done first.
 
 ### `pkg/system` — Actor system with registry and lifecycle
 
 - **`ActorSystem`** — Flat name registry. Thread-safe. After `StopAll`, further ops return `ErrSystemStopped`.
 - **`ManagedActor`** — `Stop`, `State` only (registry shutdown). Unlike `supervision.ChildRef`, it has no `Done` — death watch belongs to the supervisor, not the system.
-- **`Register[T](s, name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **free functions** (not methods). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
-- **`Spawn[T]`** — `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
+- **`Register[T](name, ref)`**, **`Send[T]`**, **`Ask[T, R]`** — Generic **methods** on `*ActorSystem` (Go 1.27 generic methods; they cannot appear in interfaces, so `ManagedActor` / `Stoppable` stay non-generic). Register captures a type-erased dispatch closure; Send/Ask type-assert and return `ErrCommandTypeMismatch` on mismatch.
+- **`Spawn[T, PT]`** — method; `actor.StartNew` + `actorref.New` + `Register`. Always applies `WithName` from the registry name. On WaitReady or register failure, stops the actor (best effort) so the system is unchanged.
 - Methods: `Get` → `ManagedActor`, `Unregister` (does **not** stop the actor; tombstones the LIFO slot), `Count`, `StopAll` (LIFO, then emit events), `OnEvent`.
 - **`stopManaged`** — `StopAll`'s per-actor stop. `actor.ErrActorNotRunning` is not proof of exit (also returned for Stopping, and for StoppedWithError after a timed-out Stop whose goroutine is still running). If the actor exposes `Done()` (`actorref.Ref` does) it waits via `stopwait.Wait`; otherwise only Done / Canceled / Panicked count as stopped. A never-started (Initialized) actor returns its `ErrActorNotRunning` immediately — its `Done()` would never close.
 - **Event bus** — `EventActorStarted` (Spawn only), `EventActorStopped`, `EventSystemStopping`. Handlers run synchronously in registration order. `StopAll` emits `EventSystemStopping` then one `EventActorStopped` per actor.
@@ -115,7 +117,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/deadletter` — Dead letter queue
 
-- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Default capacity 1000, oldest evicted. Capacity `<= 0` retains nothing but still notifies handlers. Thread-safe.
+- **`Queue`** — Opt-in; callers `Publish` undeliverable messages. Fixed-size ring buffer: default capacity 1000, oldest overwritten; `Publish` does not allocate. Capacity `<= 0` retains nothing but still notifies handlers. Thread-safe.
 - **`Letter`** — `Target` (actor name), `Reason`.
 - **`OnDeadLetter`**, **`Letters()`** (copy), **`Count()`**, **`Clear()`**.
 
@@ -127,7 +129,7 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 
 ### `pkg/mailbox` — Alternative mailbox implementations
 
-- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `GoActor.Receive` (actor mailbox is a bounded channel).
+- **`PriorityMailbox[T]`** — Standalone, thread-safe heap (`go-datalib` `tree.Heap`). Not wired into `Actor.Receive` (actor mailbox is a bounded channel).
 - Priority: `System` > `High` > `Normal` > `Low` (iota; lower value = higher priority). FIFO via insertion `seq` within the same priority.
 - **`Push`** returns false if full (`maxSize > 0`) or closed. **`Pop`**, **`Notify`** (buffered 1, non-blocking signal), **`Size`**, **`Close`**, **`IsEmpty`**.
 
@@ -146,15 +148,17 @@ Ten packages under `pkg/`, plus `internal/stopwait` (shared shutdown wait).
 1. Define entity implementing `Entity`, create a provider implementing `EntityProvider[T]`.
 2. Create and start: `actor.StartNew(ctx, timeout, WithProvider(provider), opts...)` or `New` → `Start` → `WaitReady`.
 3. Obtain a ref: `ref, err := actorref.New(myActor)`.
-4. Or spawn: `ref, err := system.Spawn(sys, ctx, "name", provider, timeout, opts...)`.
-5. Send: `ref.Send(ctx, command.New(delegateFn))` or `system.Send` / `ask.New` / `system.Ask`.
+4. Or spawn: `ref, err := sys.Spawn(ctx, "name", provider, timeout, opts...)`.
+5. Send: `ref.Send(ctx, command.New(delegateFn))` or `sys.Send` / `ref.Ask` / `sys.Ask`.
 6. Get results: `<-cmd.Done()`, then `cmd.Error()`.
-7. Dynamic behavior: `actor.GetGoActorContext[T](ctx).Become(newHandler)`.
+7. Dynamic behavior: `actor.GetActorContext[T](ctx).Become(newHandler)`.
 8. Shutdown: `ref.Stop(timeout)` or `sys.StopAll(timeout)` or `signal.AwaitShutdown(ctx, sys, timeout)`.
 
 ## Code Conventions
 
 - Heavy use of Go generics for type safety — avoid raw `interface{}`.
+- Entity type parameters name the base type (`[Counter]`, never `[*Counter]`); the actor manages `*T`.
+- Prefer generic methods (Go 1.27) over free functions when there is a natural receiver (`ref.Ask`, `sys.Spawn`). Interfaces cannot declare generic methods, so keep interface method sets non-generic. Editors need a gopls built for Go 1.27, or they report `method must have no type parameters`.
 - All concurrency is channel-based with atomic state management; no shared mutable state between actors.
 - Panic recovery is built into actor and command execution; panics become errors via `errors.Join()`. A recovered actor panic terminates the actor.
 - Prefer sentinel errors (wrap with `%w`) over ad-hoc `fmt.Errorf` so callers can use `errors.Is`.

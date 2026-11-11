@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // testEntity is a mock entity for testing purposes.
@@ -94,10 +94,10 @@ func TestActorRefTestSuite(t *testing.T) {
 	suite.Run(t, new(ActorRefTestSuite))
 }
 
-func (s *ActorRefTestSuite) newStartedActor() *actor.GoActor[*testEntity] {
+func (s *ActorRefTestSuite) newStartedActor() *actor.Actor[testEntity] {
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithInputBufferSize[*testEntity](10),
+		actor.WithInputBufferSize[testEntity](10),
 	)
 	s.Require().NoError(err)
 
@@ -127,7 +127,7 @@ func (s *ActorRefTestSuite) TestNew_ValidActor_ShouldCreateRef() {
 
 func (s *ActorRefTestSuite) TestNew_NilActor_ShouldReturnError() {
 	// Act
-	ref, err := New[*testEntity](nil)
+	ref, err := New[testEntity](nil)
 
 	// Assert
 	s.Error(err)
@@ -200,8 +200,8 @@ func (s *ActorRefTestSuite) TestSend_CancelledContext_ShouldReturnError() {
 	// Arrange — unbuffered channel + no timeout so send blocks on context
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithInputBufferSize[*testEntity](0),
-		actor.WithReceiveTimeout[*testEntity](0),
+		actor.WithInputBufferSize[testEntity](0),
+		actor.WithReceiveTimeout[testEntity](0),
 	)
 	s.Require().NoError(err)
 

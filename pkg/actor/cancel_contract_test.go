@@ -33,12 +33,12 @@ func (c *funcCancelCommand) Cancel(err error) {
 // startBlocked starts an actor, occupies it with a blocking command and
 // returns the release channel.
 func startBlocked(
-	t *testing.T, ctx context.Context, opts ...GoActorOption[*TestEntity],
-) (a *GoActor[*TestEntity], release chan struct{}) {
+	t *testing.T, ctx context.Context, opts ...Option[TestEntity],
+) (a *Actor[TestEntity], release chan struct{}) {
 	t.Helper()
-	all := append([]GoActorOption[*TestEntity]{
-		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
-		WithInputBufferSize[*TestEntity](4),
+	all := append([]Option[TestEntity]{
+		WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
+		WithInputBufferSize[TestEntity](4),
 	}, opts...)
 	a, err := StartNew(ctx, time.Second, all...)
 	require.NoError(t, err)
@@ -57,8 +57,8 @@ func TestDrain_WithSenderBlockedOnFullMailboxAndNoTimeout_ShouldReleaseSender(t 
 	// Arrange — buffer of 1 is filled; the next sender blocks with no receive timeout.
 	ctx, cancel := context.WithCancel(context.Background())
 	a, release := startBlocked(t, ctx,
-		WithInputBufferSize[*TestEntity](1),
-		WithReceiveTimeout[*TestEntity](0),
+		WithInputBufferSize[TestEntity](1),
+		WithReceiveTimeout[TestEntity](0),
 	)
 	require.NoError(t, a.Receive(context.Background(), &funcCancelCommand{}))
 
@@ -135,7 +135,7 @@ func TestDrain_WhenCancelStopsSameActor_ShouldNotDeadlock(t *testing.T) {
 func TestDrain_WhenCancelPanics_ShouldStillCancelRemainingCommandsAndReportError(t *testing.T) {
 	// Arrange
 	hooks := NewTestHooks()
-	a, release := startBlocked(t, context.Background(), WithHooks[*TestEntity](hooks))
+	a, release := startBlocked(t, context.Background(), WithHooks[TestEntity](hooks))
 
 	panicking := &funcCancelCommand{cancelFn: func(error) { panic("cancel boom") }}
 	after := &funcCancelCommand{}
@@ -198,8 +198,8 @@ func TestDrain_WhenCancelReceivesOnSameActorOnContextCancel_ShouldBeRejected(t *
 		// full mailbox would block the actor goroutine forever.
 		ctx, cancel := context.WithCancel(context.Background())
 		a, release := startBlocked(t, ctx,
-			WithInputBufferSize[*TestEntity](1),
-			WithReceiveTimeout[*TestEntity](0),
+			WithInputBufferSize[TestEntity](1),
+			WithReceiveTimeout[TestEntity](0),
 		)
 
 		var reentrantErr atomic.Value

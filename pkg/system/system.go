@@ -3,7 +3,7 @@
 //
 // The ActorSystem serves as a central registry for actors, enabling:
 //   - Named actor lookup and management
-//   - Type-safe command dispatch via generic free functions
+//   - Type-safe command dispatch via generic methods
 //   - Ordered shutdown (last registered = first stopped)
 //
 // Actors are created, started, and wrapped in actorref.Ref externally. The system
@@ -12,8 +12,8 @@
 // Example usage:
 //
 //	sys := system.New()
-//	system.Register(sys, "worker-1", workerRef)
-//	system.Send(sys, ctx, "worker-1", myCommand)
+//	sys.Register("worker-1", workerRef)
+//	sys.Send(ctx, "worker-1", myCommand)
 //	sys.StopAll(10 * time.Second)
 package system
 
@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/internal/stopwait"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/internal/stopwait"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // ManagedActor defines the minimal interface for actors managed by an ActorSystem.

@@ -12,7 +12,7 @@ import (
 
 func TestStart_Concurrent_ShouldStartExactlyOnce(t *testing.T) {
 	for range 500 {
-		a, err := New(WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
+		a, err := New(WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
 		require.NoError(t, err)
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -45,7 +45,7 @@ func TestStart_Concurrent_ShouldStartExactlyOnce(t *testing.T) {
 
 func TestStart_AfterStart_ShouldReturnErrActorAlreadyStarted(t *testing.T) {
 	a, err := StartNew(context.Background(), time.Second,
-		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
+		WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
 	require.NoError(t, err)
 	defer func() { _ = a.Stop(time.Second) }()
 
@@ -63,7 +63,7 @@ func (p *flakyProvider) Provide() *TestEntity {
 }
 
 func TestStart_AfterFailedStart_ShouldAllowRetry(t *testing.T) {
-	a, err := New(WithProvider[*TestEntity](&flakyProvider{}))
+	a, err := New(WithProvider[TestEntity](&flakyProvider{}))
 	require.NoError(t, err)
 
 	require.ErrorIs(t, a.Start(context.Background()), ErrActorNilEntity)

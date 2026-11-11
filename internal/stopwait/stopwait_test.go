@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 func TestWait_WithClosedDoneAndNonPositiveTimeout_ShouldReturnNil(t *testing.T) {

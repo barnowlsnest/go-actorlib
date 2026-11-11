@@ -9,12 +9,22 @@ package "Type System" {
     +IsProvidable() bool
   }
 
+  interface "EntityPtr<T>" as EntityPtr <<constraint>> {
+    *T
+    Entity
+  }
+  note right of EntityPtr
+    T is the entity's base type (Actor[Counter]);
+    actors always manage *T. New / StartNew / Spawn
+    infer PT EntityPtr[T] to require *T implements Entity.
+  end note
+
   interface "Executable<T>" as Executable {
-    +Execute(context.Context, T)
+    +Execute(context.Context, *T)
   }
 
   interface "EntityProvider<T>" as EntityProvider {
-    +Provide() T
+    +Provide() *T
   }
 
   interface Hooks {
@@ -27,7 +37,7 @@ package "Type System" {
 }
 
 package "Actor Core (pkg/actor)" {
-  class "GoActor<T>" as GoActor {
+  class "Actor<T>" as Actor {
     -state uint64
     -input chan Executable<T>
     -done chan struct{}
@@ -37,11 +47,11 @@ package "Actor Core (pkg/actor)" {
     -hooks Hooks
     -provider EntityProvider<T>
     -behavior *BehaviorStack<T>
-    -actorCtx *GoActorContext<T>
+    -actorCtx *ActorContext<T>
     -middleware []Middleware<T>
     --
-    +{static} New(opts...) (*GoActor<T>, error)
-    +{static} StartNew(ctx, timeout, opts...) (*GoActor<T>, error)
+    +{static} New(opts...) (*Actor<T>, error)
+    +{static} StartNew(ctx, timeout, opts...) (*Actor<T>, error)
     +Start(context.Context) error
     +Stop(time.Duration) error
     +Receive(context.Context, Executable<T>) error
@@ -52,7 +62,7 @@ package "Actor Core (pkg/actor)" {
   }
 
   class "HandlerFunc<T>" as HandlerFunc <<type>> {
-    func(ctx, Executable<T>, T)
+    func(ctx, Executable<T>, *T)
   }
 
   class "Middleware<T>" as MiddlewareType <<type>> {
@@ -69,7 +79,7 @@ package "Actor Core (pkg/actor)" {
     +Depth() int
   }
 
-  class "GoActorContext<T>" as GoActorContext {
+  class "ActorContext<T>" as ActorContext {
     -behavior *BehaviorStack<T>
     -name string
     --
@@ -78,10 +88,10 @@ package "Actor Core (pkg/actor)" {
     +Unbecome() bool
     +Name() string
     ..
-    +{static} GetGoActorContext<T>(ctx) *GoActorContext<T>
+    +{static} GetActorContext<T>(ctx) *ActorContext<T>
   }
 
-  class "GoActorOption<T>" as GoActorOption <<type>> {
+  class "Option<T>" as Option <<type>> {
     +WithProvider(EntityProvider<T>)
     +WithInputBufferSize(int)
     +WithReceiveTimeout(time.Duration)
@@ -93,10 +103,11 @@ package "Actor Core (pkg/actor)" {
 
 package "Actor Ref (pkg/actorref)" {
   class "Ref<T>" as Ref {
-    -actor *GoActor<T>
+    -actor *Actor<T>
     --
     +{static} New(actor) (*Ref<T>, error)
     +Send(context.Context, Executable<T>) error
+    +Ask[R](ctx, DelegateFn<T,R>, timeout) (R, error)
     +Stop(time.Duration) error
     +State() uint64
     +Done() <-chan struct{}
@@ -104,13 +115,13 @@ package "Actor Ref (pkg/actorref)" {
 }
 
 package "Command System (pkg/command)" {
-  class "GoCommand<E,R>" as GoCommand {
+  class "Command<E,R>" as Command {
     -state int
     -done chan R
     -err error
     -delegateFn DelegateFn<E,R>
     --
-    +{static} New(DelegateFn<E,R>) *GoCommand<E,R>
+    +{static} New(DelegateFn<E,R>) *Command<E,R>
     +Execute(context.Context, E)
     +Done() <-chan R
     +Error() error
@@ -118,13 +129,13 @@ package "Command System (pkg/command)" {
   }
 
   class "DelegateFn<T,R>" as DelegateFn <<type>> {
-    func(entity T) (R, error)
+    func(entity *T) (R, error)
   }
 }
 
 package "Ask (pkg/ask)" {
-  class "ask.New<E,R>" as AskNew <<function>> {
-    +New(ctx, ref, fn, timeout) (R, error)
+  class "ask.Await<E,R>" as AskAwait <<function>> {
+    +Await(ctx, *Command<E,R>, timeout) (R, error)
   }
 }
 
@@ -145,10 +156,10 @@ package "Actor System (pkg/system)" {
     +StopAll(timeout) error
     +Count() int
     +OnEvent(EventHandler)
-  }
-
-  class "Spawn<T>" as Spawn <<function>> {
-    +Spawn(sys, ctx, name, provider, timeout, opts...) (*Ref<T>, error)
+    +Spawn[T](ctx, name, provider, timeout, opts...) (*Ref<T>, error)
+    +Register[T](name, *Ref<T>) error
+    +Send[T](ctx, name, Executable<T>) error
+    +Ask[T,R](ctx, name, DelegateFn<T,R>, timeout) (R, error)
   }
 
   class Event {
@@ -245,38 +256,38 @@ package "Mailbox (pkg/mailbox)" {
 }
 
 ' Inheritance / implementation
-GoCommand ..|> Executable
+Command ..|> Executable
 Ref ..|> ManagedActor
 Ref ..|> ChildRef
 
 ' Composition
-GoActor *-- EntityProvider
-GoActor *-- Hooks
-GoActor *-- BehaviorStack
-GoActor *-- GoActorContext
-GoActor o-- Executable : processes
-GoActor o-- MiddlewareType : chains
-GoCommand *-- DelegateFn
-Ref --> GoActor : wraps
+Actor *-- EntityProvider
+Actor *-- Hooks
+Actor *-- BehaviorStack
+Actor *-- ActorContext
+Actor o-- Executable : processes
+Actor o-- MiddlewareType : chains
+Command *-- DelegateFn
+Ref --> Actor : wraps
 
 ' Dependencies
 EntityProvider ..> Entity : provides
 DelegateFn ..> Entity : operates on
 Executable ..> Entity : processes
-GoActorOption ..> GoActor : configures
+EntityPtr --|> Entity
+Option ..> Actor : configures
 HandlerFunc ..> Executable : handles
-GoActorContext --> BehaviorStack : delegates to
+ActorContext --> BehaviorStack : delegates to
 
 ' Ask uses Ref
-AskNew ..> Ref : sends command via
-AskNew ..> GoCommand : creates and awaits
-AskNew ..> DelegateFn : wraps into command
+Ref ..> DelegateFn : Ask wraps into command
+Ref ..> AskAwait : Ask waits via
+AskAwait ..> Command : awaits
 
 ' System
 ActorSystem o-- ManagedActor : manages
-Spawn ..> GoActor : creates
-Spawn ..> Ref : wraps in
-Spawn ..> ActorSystem : registers with
+ActorSystem ..> Actor : Spawn creates
+ActorSystem ..> Ref : Spawn wraps in
 ActorSystem --> Event : emits
 
 ' Supervision

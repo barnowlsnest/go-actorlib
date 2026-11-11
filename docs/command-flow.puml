@@ -5,8 +5,8 @@ skinparam backgroundColor #FFFFFF
 title Command Execution Flow
 
 participant "Client" as client
-participant "GoCommand<E,R>" as cmd
-participant "GoActor<E>" as actor
+participant "Command<E,R>" as cmd
+participant "Actor<E>" as actor
 participant "Entity" as entity
 participant "Result Channel" as channel
 

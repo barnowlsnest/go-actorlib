@@ -4,22 +4,22 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/ask"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/ask"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 )
 
 // Register adds a typed actor reference to the system under the given name.
 // It captures a dispatch closure at registration time that enables type-safe
-// command routing via [Send] and [Ask].
+// command routing via [ActorSystem.Send] and [ActorSystem.Ask].
 //
 // Returns an error if:
 //   - The system is stopped ([ErrSystemStopped])
 //   - The name is empty ([ErrActorNameEmpty])
 //   - The ref is nil ([ErrActorNilRef])
 //   - The name is already registered ([ErrActorNameDuplicate])
-func Register[T actor.Entity](s *ActorSystem, name string, ref *actorref.Ref[T]) error {
+func (s *ActorSystem) Register[T any](name string, ref *actorref.Ref[T]) error {
 	if ref == nil {
 		return ErrActorNilRef
 	}
@@ -42,14 +42,14 @@ func Register[T actor.Entity](s *ActorSystem, name string, ref *actorref.Ref[T])
 //   - The actor name is not found ([ErrActorNotFound])
 //   - The command type does not match the actor's entity type ([ErrCommandTypeMismatch])
 //   - The underlying actor send fails (e.g., buffer full, actor stopped)
-func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd actor.Executable[T]) error {
+func (s *ActorSystem) Send[T any](ctx context.Context, name string, cmd actor.Executable[T]) error {
 	return s.send(ctx, name, cmd)
 }
 
 // Ask dispatches a request/response command to the actor registered under the given name
 // and waits for the result with a timeout.
 //
-// It creates a [command.GoCommand] from the provided delegate function, dispatches it
+// It creates a [command.Command] from the provided delegate function, dispatches it
 // via the system, and waits for the result. The call returns when one of the following happens:
 //   - The command completes (successfully or with an error)
 //   - The context is canceled
@@ -57,8 +57,7 @@ func Send[T actor.Entity](s *ActorSystem, ctx context.Context, name string, cmd 
 //
 // Returns the command result and nil on success, or the zero value of R and an error on failure.
 // Timeout errors are [ask.ErrAskTimeout] (also available as [ErrAskTimeout]).
-func Ask[T actor.Entity, R any](
-	s *ActorSystem,
+func (s *ActorSystem) Ask[T, R any](
 	ctx context.Context,
 	name string,
 	fn command.DelegateFn[T, R],

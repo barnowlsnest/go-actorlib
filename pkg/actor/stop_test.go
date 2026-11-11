@@ -13,8 +13,8 @@ func TestStop_WhenTimeoutElapses_ShouldReturnGracefulStopTimeout(t *testing.T) {
 	// Arrange
 	hooks := NewTestHooks()
 	a, err := StartNew(context.Background(), time.Second,
-		WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
-		WithHooks[*TestEntity](hooks),
+		WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))),
+		WithHooks[TestEntity](hooks),
 	)
 	require.NoError(t, err)
 
@@ -41,9 +41,9 @@ func TestStop_WhenTimeoutElapses_ShouldReturnGracefulStopTimeout(t *testing.T) {
 }
 
 func TestStop_WhenNotRunning_ShouldReturnErrActorNotRunning(t *testing.T) {
-	newActor := func(t *testing.T) *GoActor[*TestEntity] {
+	newActor := func(t *testing.T) *Actor[TestEntity] {
 		t.Helper()
-		a, err := New(WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
+		a, err := New(WithProvider[TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
 		require.NoError(t, err)
 		return a
 	}

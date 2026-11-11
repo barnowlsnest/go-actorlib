@@ -10,7 +10,7 @@ import (
 	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // --- Test Entity ---
@@ -99,8 +99,8 @@ func (s *MiddlewareTestSuite) TestLogging_ShouldLogMessages() {
 
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithMiddleware(Logging[*testEntity](log)),
-		actor.WithName[*testEntity]("test-actor"),
+		actor.WithMiddleware(Logging[testEntity](log)),
+		actor.WithName[testEntity]("test-actor"),
 	)
 	s.Require().NoError(err)
 
@@ -128,7 +128,7 @@ func (s *MiddlewareTestSuite) TestMetrics_ShouldTrackMessageCount() {
 
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithMiddleware(MetricsMiddleware[*testEntity](metrics)),
+		actor.WithMiddleware(MetricsMiddleware[testEntity](metrics)),
 	)
 	s.Require().NoError(err)
 
@@ -173,8 +173,8 @@ func (s *MiddlewareTestSuite) TestRecovery_ShouldCatchPanic() {
 
 	a, err := actor.New(
 		actor.WithProvider(s.provider),
-		actor.WithMiddleware(Recovery[*testEntity](log)),
-		actor.WithName[*testEntity]("panic-actor"),
+		actor.WithMiddleware(Recovery[testEntity](log)),
+		actor.WithName[testEntity]("panic-actor"),
 	)
 	s.Require().NoError(err)
 
