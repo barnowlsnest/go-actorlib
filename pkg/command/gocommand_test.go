@@ -591,3 +591,22 @@ func (s *GoCommandTestSuite) TestCancel_Twice_ShouldNotPanic() {
 	cmd.Cancel(errors.New("first"))
 	s.NotPanics(func() { cmd.Cancel(errors.New("second")) })
 }
+
+func (s *GoCommandTestSuite) TestExecute_AfterCancel_ShouldNotRunDelegateOrPanic() {
+	// Arrange
+	called := false
+	cmd := New(func(_ *TestEntity) (int, error) {
+		called = true
+		return 0, nil
+	})
+	cause := errors.New("dropped")
+	cmd.Cancel(cause)
+
+	// Act
+	s.NotPanics(func() { cmd.Execute(s.ctx, NewTestEntity("v", true)) })
+
+	// Assert
+	s.False(called)
+	s.Equal(Canceled, cmd.State())
+	s.ErrorIs(cmd.Error(), cause)
+}

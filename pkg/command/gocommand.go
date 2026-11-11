@@ -179,7 +179,7 @@ func (gc *GoCommand[E, R]) State() int {
 // This method implements the actor.Executable interface, allowing commands
 // to be sent to actors for execution. The execution process:
 //
-//  1. Sets state to Started
+//  1. Sets state to Started (no-op if the command already ran or was canceled)
 //  2. Checks for context cancellation
 //  3. Calls the delegate function with panic recovery
 //  4. Handles the result or error appropriately
@@ -188,7 +188,9 @@ func (gc *GoCommand[E, R]) State() int {
 // The method handles all error conditions gracefully and ensures the
 // result channel is always closed, regardless of outcome.
 func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
-	gc.syncState(Started, nil)
+	if !gc.begin() {
+		return
+	}
 
 	select {
 	case <-ctx.Done():
@@ -218,6 +220,20 @@ func (gc *GoCommand[E, R]) Execute(ctx context.Context, entity E) {
 		}()
 		return
 	}
+}
+
+// begin moves the command from Created to Started. It returns false if the
+// command already ran or was canceled, so Execute cannot re-close Done.
+func (gc *GoCommand[E, R]) begin() bool {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	if gc.state != Created {
+		return false
+	}
+
+	gc.state = Started
+	return true
 }
 
 // Cancel marks a command that has not started executing as Canceled with err
