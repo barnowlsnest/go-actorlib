@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 )
 
 // Await waits for a command result until it completes, ctx is done, or timeout elapses.

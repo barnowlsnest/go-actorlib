@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/ask"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/ask"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 )
 
 // Register adds a typed actor reference to the system under the given name.

@@ -2,7 +2,7 @@
 
 A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model) library for Go. Actors run on native goroutines and channels — no extra runtime, no shared mutable state.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/go-actorlib/v5.svg)](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5)
+[![Go Reference](https://pkg.go.dev/badge/github.com/barnowlsnest/go-actorlib/v6.svg)](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/barnowlsnest/go-actorlib)](go.mod)
 [![Build](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/build.yml)
 [![Lint](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/barnowlsnest/go-actorlib/actions/workflows/golangci-lint.yml)
@@ -61,7 +61,7 @@ Go already has goroutines, channels, and `sync.Mutex`. Use this library when you
 ## Installation
 
 ```bash
-go get github.com/barnowlsnest/go-actorlib/v5
+go get github.com/barnowlsnest/go-actorlib/v6
 ```
 
 Requires **Go 1.27** or later.
@@ -79,8 +79,8 @@ import (
     "log"
     "time"
 
-    "github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
-    "github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
+    "github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
+    "github.com/barnowlsnest/go-actorlib/v6/pkg/actorref"
 )
 
 type Counter struct{ Value int }
@@ -126,7 +126,7 @@ Defaults: input buffer size `16`, receive timeout `5s`. A receive timeout of `0`
 ### Commands
 
 ```go
-import "github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+import "github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 
 cmd := command.New(func(counter *Counter) (int, error) {
     counter.Value++
@@ -342,16 +342,16 @@ msg, ok := mb.Pop() // systemCmd
 
 | Package | Description |
 |---|---|
-| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
-| [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/actorref) | Typed `Ref`: `Send`, `Ask`, `Stop`, `State`, `Done` |
-| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/command) | `Command` with `DelegateFn` and a result channel |
-| [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/ask) | `Await` (shared wait behind `Ref.Ask` / `ActorSystem.Ask`), `ErrAskTimeout` |
-| [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/system) | Name registry; `Spawn`, `Register`/`Send`/`Ask` methods; event bus |
-| [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
-| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
-| [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/deadletter) | Dead-letter queue with capacity and handlers |
-| [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
-| [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v5/pkg/mailbox) | Standalone priority mailbox |
+| [`pkg/actor`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actor) | `Actor`, `Entity`, `Executable`, `Hooks`, `BehaviorStack`, `GoActorContext`, middleware, `StartNew` |
+| [`pkg/actorref`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/actorref) | Typed `Ref`: `Send`, `Ask`, `Stop`, `State`, `Done` |
+| [`pkg/command`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/command) | `Command` with `DelegateFn` and a result channel |
+| [`pkg/ask`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/ask) | `Await` (shared wait behind `Ref.Ask` / `ActorSystem.Ask`), `ErrAskTimeout` |
+| [`pkg/system`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/system) | Name registry; `Spawn`, `Register`/`Send`/`Ask` methods; event bus |
+| [`pkg/supervision`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/supervision) | Supervisor: OneForOne / AllForOne, `ChildSpec`, death watch |
+| [`pkg/middleware`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/middleware) | Logging (`go-logslib`), Metrics (atomic), Recovery |
+| [`pkg/deadletter`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/deadletter) | Dead-letter queue with capacity and handlers |
+| [`pkg/signal`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/signal) | `AwaitShutdown`, `NotifyShutdown` |
+| [`pkg/mailbox`](https://pkg.go.dev/github.com/barnowlsnest/go-actorlib/v6/pkg/mailbox) | Standalone priority mailbox |
 
 PlantUML diagrams: [`docs/`](./docs/README.md).
 

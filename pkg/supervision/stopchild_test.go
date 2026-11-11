@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actorref"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actorref"
 )
 
 func TestStopChild_WithZeroTimeoutOnTerminatedChild_ShouldAlwaysSucceed(t *testing.T) {

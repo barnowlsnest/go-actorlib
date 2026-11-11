@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/command"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/command"
 )
 
 type counter struct{ n int }

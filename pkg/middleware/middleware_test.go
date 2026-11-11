@@ -10,7 +10,7 @@ import (
 	"github.com/barnowlsnest/go-logslib/v2/pkg/logger"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // --- Test Entity ---

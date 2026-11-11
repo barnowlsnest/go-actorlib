@@ -49,7 +49,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // Command execution states define the lifecycle stages of command processing.

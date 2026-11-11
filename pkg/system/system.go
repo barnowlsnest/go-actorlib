@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/internal/stopwait"
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/internal/stopwait"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // ManagedActor defines the minimal interface for actors managed by an ActorSystem.

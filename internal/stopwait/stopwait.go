@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
+	"github.com/barnowlsnest/go-actorlib/v6/pkg/actor"
 )
 
 // Wait returns nil once done is closed, or an error wrapping
