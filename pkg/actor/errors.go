@@ -47,6 +47,10 @@ var (
 	// Actors in Stopping, Done, StoppedWithError, Canceled, or Panicked states cannot receive messages.
 	ErrActorReceiveOnStopped = errors.New("actor receive on stopped actor")
 
+	// ErrActorAlreadyStarted is returned by Start when the actor has already been
+	// started (or another Start call is in progress).
+	ErrActorAlreadyStarted = errors.New("actor already started")
+
 	// ErrActorNotRunning is returned by Stop when the actor is not in the Started state:
 	// it was never started, is already stopping, or has already terminated.
 	// The returned error wraps it together with the current state.

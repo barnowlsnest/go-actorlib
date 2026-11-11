@@ -183,6 +183,8 @@ type (
 		sendMu sync.RWMutex
 		closed bool
 
+		starting atomic.Bool // set by the Start call that owns the loop goroutine
+
 		hooks    Hooks
 		provider EntityProvider[T]
 		name     string
@@ -389,10 +391,16 @@ func (ga *GoActor[T]) Receive(ctx context.Context, e Executable[T]) error {
 //  3. BeforeStop (when stopping)
 //  4. AfterStop (after stopped)
 //
+// Start succeeds at most once. Concurrent or repeated calls return
+// [ErrActorAlreadyStarted]. A Start that fails validation (nil or
+// non-providable entity) may be retried.
+//
 // Returns an error if the entity is nil, not providable, or if startup fails.
 func (ga *GoActor[T]) Start(ctx context.Context) error {
-	if err := ga.CheckState(Initialized); err != nil {
-		return err
+	// Claim the one-shot start slot: state stays Initialized until the loop
+	// goroutine runs, so the state alone cannot guard concurrent Start calls.
+	if atomic.LoadUint64(&ga.state) != Initialized || !ga.starting.CompareAndSwap(false, true) {
+		return ErrActorAlreadyStarted
 	}
 
 	entity := ga.provider.Provide()
@@ -401,10 +409,12 @@ func (ga *GoActor[T]) Start(ctx context.Context) error {
 	// We can't use any(entity) == nil because it doesn't work with nil pointers converted to interfaces
 	rv := reflect.ValueOf(entity)
 	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
+		ga.starting.Store(false) // allow a retry after a failed Start
 		return ErrActorNilEntity
 	}
 
 	if !entity.IsProvidable() {
+		ga.starting.Store(false) // allow a retry after a failed Start
 		return ErrActorNilEntity
 	}
 

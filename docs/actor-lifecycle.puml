@@ -14,12 +14,12 @@ state "Panicked" as panicked : Recovered from panic
 
 [*] --> init : actor.New(opts...)\nor actor.StartNew()
 
-init --> started : Start(ctx)\n[CheckState(Initialized) guard]
-init --> error : Start() fails\n(e.g. provider missing)
+init --> started : Start(ctx)\n[one-shot atomic guard;\nlosers get ErrActorAlreadyStarted]
+init --> init : Start() fails validation\n(nil / non-providable entity)\n→ may be retried
 
 started --> stopping : Stop()\n[atomic.CompareAndSwapUint64]\nclose(stop channel)
 started --> cancelled : Context cancelled
-started --> panicked : Panic recovered\n(catchPanic → OnError hook)
+started --> panicked : Panic recovered in handler\nor AfterStart (catchPanic → OnError)\n→ loop exits, done closed
 started --> error : Error during execution
 
 stopping --> done : Graceful shutdown complete\nclose(done channel)
@@ -57,6 +57,8 @@ note right of stopping
   **CAS-based Stop:**
   CompareAndSwap(Started → Stopping)
   ensures concurrent Stop() calls are safe
+  Timeout → StoppedWithError and
+  Stop returns ErrActorGracefulStopTimeout
 
   **Hooks:** BeforeStop, AfterStop
 end note
@@ -65,6 +67,17 @@ note bottom of error
   **Terminal state**
   Hooks: OnError
   done channel closed
+end note
+
+note bottom of panicked
+  **On every loop exit** (stop, ctx, panic):
+  close(exiting) wakes blocked senders,
+  further Receive → ErrActorReceiveOnStopped,
+  queued commands drained:
+  Cancelable.Cancel(ErrActorCommandDropped)
+
+  Stop() in any non-Started state
+  → ErrActorNotRunning
 end note
 
 @enduml

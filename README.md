@@ -21,7 +21,8 @@ A lightweight, type-safe [Actor Model](https://en.wikipedia.org/wiki/Actor_model
 - **Dead letters** — queue for undeliverable messages with handlers
 - **Priority mailbox** — `System` > `High` > `Normal` > `Low` (standalone; not wired into `GoActor`)
 - **Signals** — SIGTERM / SIGINT graceful shutdown
-- **Panic recovery** — panics become errors; actors and commands stay isolated
+- **Panic recovery** — panics become errors; a panicked actor terminates cleanly (`Done()` closes) so supervisors can restart it
+- **Dropped commands are canceled** — `GoCommand`s (and any `actor.Cancelable`) still queued when an actor terminates are canceled, so waiters fail fast instead of timing out
 - **Race-tested** — the suite runs with the `-race` detector
 
 ## Why an actor library in Go?
@@ -143,6 +144,17 @@ fmt.Printf("Counter value: %d\n", result)
 return cmd.Error()
 ```
 
+A `GoCommand` runs at most once — sending the same command twice executes it once. When it does not succeed, `Done()` closes without a value and `Error()` explains why:
+
+| Outcome | `State()` | `Error()` |
+|---|---|---|
+| Delegate returned an error | `Failed` | the delegate's error |
+| Delegate panicked | `Panic` | `ErrCommandPanic` joined with the panic value — use `errors.Is` |
+| Context canceled before execution | `Canceled` | `ErrCommandContextCancelled` joined with `ctx.Err()` |
+| Actor terminated while the command was queued | `Canceled` | `actor.ErrActorCommandDropped` |
+
+Custom `Executable` types can implement `actor.Cancelable` (`Cancel(err error)`) to be notified when they are dropped. `Cancel` runs on the actor's goroutine before `Done()` closes, so keep it quick and never block in it on the actor itself (for example by waiting on its `Done()`) — that stalls shutdown and makes `Stop` time out.
+
 ### Manual lifecycle
 
 `StartNew` is `New` + `Start` + `WaitReady`. The step-by-step form is useful when you need hooks between those calls:
@@ -163,6 +175,13 @@ if err := myActor.WaitReady(ctx, 5*time.Second); err != nil {
     log.Fatal(err)
 }
 ```
+
+### Lifecycle rules and errors
+
+- **Start once.** `Start` succeeds at most once; concurrent or repeated calls return `ErrActorAlreadyStarted`. A `Start` that fails validation (`ErrActorNilEntity`) may be retried.
+- **Panics are terminal.** A panic recovered from a handler or the `AfterStart` hook moves the actor to `Panicked` and ends its goroutine; `Done()` closes. Use the `Recovery` middleware to keep the actor alive instead.
+- **Termination drains the mailbox.** On `Stop`, context cancellation, or panic, `Receive` starts returning `ErrActorReceiveOnStopped` and the mailbox is drained. Queued commands that implement `actor.Cancelable` — including every `GoCommand` — are canceled with `ErrActorCommandDropped` (see [Commands](#commands)); other queued `Executable` values are discarded without notification.
+- **Stop errors.** `Stop` returns `ErrActorGracefulStopTimeout` if the actor does not finish within the timeout (state `StoppedWithError`), and an error wrapping `ErrActorNotRunning` if the actor is not `Started` (never started, already stopping, or terminated). `system.StopAll` and `supervision.Supervisor.StopAll` treat `ErrActorNotRunning` as already stopped once the actor has actually exited (`Done()` closed), waiting up to their timeout for it.
 
 ### Actor system
 
@@ -196,11 +215,13 @@ sys.OnEvent(func(e system.Event) {
 sys.StopAll(10 * time.Second) // LIFO, then the system is stopped
 ```
 
+`StopAll` skips actors that already terminated on their own (for example after a panic) without reporting an error. An actor that is still running despite an earlier timed-out `Stop` is waited on, and reported with `ErrActorGracefulStopTimeout` if it does not exit within the timeout.
+
 Events: `EventActorStarted` (Spawn), `EventActorStopped`, `EventSystemStopping`.
 
 ### Supervision
 
-Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Clean `Done` stops are not restarted.
+Default policy (`DefaultRestartPolicy()`): OneForOne, max 3 restarts within 5 seconds. Failures (`Panicked`, `StoppedWithError`, `Canceled`) are restarted; clean `Done` stops are not. Stopping a child that already terminated is not reported as an error by `StopAll` or `OnRestartError`; a child that someone else is still stopping is waited on (up to the stop timeout) before it is restarted.
 
 ```go
 sup := supervision.NewSupervisor(
@@ -258,7 +279,7 @@ func authenticatedHandler(ctx context.Context, e actor.Executable[*MyEntity], en
 
 ### Middleware
 
-Place `Recovery` first if you want panics caught before they put the actor in `Panicked`. The chain is composed once at `Start`.
+Place `Recovery` first if you want panics caught before they put the actor in `Panicked` (which terminates it). The chain is composed once at `Start`.
 
 ```go
 metrics := &middleware.Metrics{}
@@ -277,7 +298,7 @@ myActor, err := actor.StartNew(ctx, 5*time.Second,
 
 ### Dead letters
 
-The queue is opt-in: publish undeliverable messages yourself (for example from a send-error path). Default capacity is 1000; the oldest letter is dropped when full.
+The queue is opt-in: publish undeliverable messages yourself (for example from a send-error path). Default capacity is 1000; the oldest letter is dropped when full. A capacity of `0` or less retains nothing but still notifies handlers.
 
 ```go
 dlq := deadletter.New(deadletter.WithCapacity(1000))

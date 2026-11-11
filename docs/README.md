@@ -30,7 +30,10 @@ Detailed class diagram showing:
 State machine diagram illustrating:
 - Actor states: Initialized → Started → Stopping → Done/Error/Cancelled/Panicked
 - CAS-based Stop() with atomic.CompareAndSwapUint64
-- Start() guard with CheckState(Initialized)
+- One-shot Start() guard (`ErrActorAlreadyStarted`); failed validation may be retried
+- Recovered panic is terminal: loop exits, `Done()` closes
+- Mailbox drained on exit: queued `Cancelable` commands get `ErrActorCommandDropped`
+- `Stop()` errors: `ErrActorGracefulStopTimeout`, `ErrActorNotRunning`
 - Four channel types: input, ready, done, stop
 - Hooks and middleware integration points
 
@@ -40,6 +43,7 @@ Sequence diagram showing:
 - Type-safe interaction between commands and entities
 - Result handling and error propagation
 - Command state machine: Created → Started → Finished/Failed/Canceled/Panic
+- Executes at most once; `Cancel` path for commands dropped by a terminating actor
 
 ### 5. [Message Passing](./message-passing.puml)
 Detailed sequence diagram of the Actor Model message passing pattern:
