@@ -39,3 +39,40 @@ func TestStop_WhenTimeoutElapses_ShouldReturnGracefulStopTimeout(t *testing.T) {
 	}
 	require.True(t, found, "OnError should still report the timeout")
 }
+
+func TestStop_WhenNotRunning_ShouldReturnErrActorNotRunning(t *testing.T) {
+	newActor := func(t *testing.T) *GoActor[*TestEntity] {
+		t.Helper()
+		a, err := New(WithProvider[*TestEntity](NewTestEntityProvider(NewTestEntity("v", true))))
+		require.NoError(t, err)
+		return a
+	}
+
+	t.Run("Initialized", func(t *testing.T) {
+		a := newActor(t)
+		require.ErrorIs(t, a.Stop(time.Second), ErrActorNotRunning)
+	})
+
+	t.Run("Done", func(t *testing.T) {
+		a := newActor(t)
+		require.NoError(t, a.Start(context.Background()))
+		require.NoError(t, a.WaitReady(context.Background(), time.Second))
+		require.NoError(t, a.Stop(time.Second))
+
+		require.ErrorIs(t, a.Stop(time.Second), ErrActorNotRunning)
+	})
+
+	t.Run("Panicked", func(t *testing.T) {
+		a := newActor(t)
+		require.NoError(t, a.Start(context.Background()))
+		require.NoError(t, a.WaitReady(context.Background(), time.Second))
+		require.NoError(t, a.Receive(context.Background(), NewTestCommand("p", func(context.Context, *TestEntity) {
+			panic("boom")
+		})))
+		<-a.Done()
+
+		err := a.Stop(time.Second)
+		require.ErrorIs(t, err, ErrActorNotRunning)
+		require.ErrorContains(t, err, "Panicked")
+	})
+}

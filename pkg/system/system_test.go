@@ -894,3 +894,130 @@ func BenchmarkStopAll(b *testing.B) {
 		_ = systems[n].StopAll(100 * time.Millisecond)
 	}
 }
+
+type panicCmd struct{}
+
+func (panicCmd) Execute(context.Context, *testEntity) { panic("boom") }
+
+func (s *ActorSystemTestSuite) TestStopAll_WithAlreadyTerminatedActor_ShouldNotReportError() {
+	// Arrange
+	sys := New()
+	ref, err := Spawn(sys, s.ctx, "crashy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	s.Require().NoError(err)
+	_, err = Spawn(sys, s.ctx, "healthy", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	s.Require().NoError(err)
+
+	s.Require().NoError(ref.Send(s.ctx, panicCmd{}))
+	<-ref.Done()
+
+	// Act
+	err = sys.StopAll(time.Second)
+
+	// Assert
+	s.NoError(err)
+}
+
+type blockingCmd struct{ started, release chan struct{} }
+
+func (b blockingCmd) Execute(context.Context, *testEntity) {
+	close(b.started)
+	<-b.release
+}
+
+// spawnTimedOut spawns an actor whose Stop already timed out: state is
+// StoppedWithError while its goroutine is still running blockingCmd.
+func (s *ActorSystemTestSuite) spawnTimedOut(sys *ActorSystem) (ref *actorref.Ref[*testEntity], release chan struct{}) {
+	ref, err := Spawn(sys, s.ctx, "slow", &testEntityProvider{entity: newTestEntity("v")}, time.Second)
+	s.Require().NoError(err)
+
+	cmd := blockingCmd{started: make(chan struct{}), release: make(chan struct{})}
+	s.Require().NoError(ref.Send(s.ctx, cmd))
+	<-cmd.started
+	s.Require().ErrorIs(ref.Stop(time.Millisecond), actor.ErrActorGracefulStopTimeout)
+	s.Require().Equal(uint64(actor.StoppedWithError), ref.State())
+
+	return ref, cmd.release
+}
+
+func (s *ActorSystemTestSuite) TestStopAll_WithStopTimedOutActorStillRunning_ShouldReportTimeout() {
+	// Arrange
+	sys := New()
+	_, release := s.spawnTimedOut(sys)
+	defer close(release)
+
+	// Act
+	err := sys.StopAll(20 * time.Millisecond)
+
+	// Assert
+	s.ErrorIs(err, actor.ErrActorGracefulStopTimeout)
+}
+
+func (s *ActorSystemTestSuite) TestStopAll_WithStopTimedOutActorFinishing_ShouldWaitForIt() {
+	// Arrange
+	sys := New()
+	ref, release := s.spawnTimedOut(sys)
+	time.AfterFunc(20*time.Millisecond, func() { close(release) })
+
+	// Act
+	err := sys.StopAll(time.Second)
+
+	// Assert
+	s.NoError(err)
+	select {
+	case <-ref.Done():
+	default:
+		s.Fail("StopAll returned before the actor exited")
+	}
+}
+
+// notRunningActor is a ManagedActor without Done whose Stop reports ErrActorNotRunning.
+type notRunningActor struct{ state uint64 }
+
+func (n *notRunningActor) Stop(time.Duration) error {
+	return fmt.Errorf("%w: state %d", actor.ErrActorNotRunning, n.state)
+}
+
+func (n *notRunningActor) State() uint64 { return n.state }
+
+func (s *ActorSystemTestSuite) TestStopAll_WithNotRunningActorWithoutDone_ShouldTrustOnlyExitedStates() {
+	for state, wantErr := range map[uint64]bool{
+		actor.Done:             false,
+		actor.Canceled:         false,
+		actor.Panicked:         false,
+		actor.Stopping:         true,
+		actor.StoppedWithError: true,
+	} {
+		// Arrange
+		sys := New()
+		s.Require().NoError(sys.register("m", &notRunningActor{state: state}, nil))
+
+		// Act
+		err := sys.StopAll(10 * time.Millisecond)
+
+		// Assert
+		if wantErr {
+			s.ErrorIs(err, actor.ErrActorNotRunning, "state %d", state)
+		} else {
+			s.NoError(err, "state %d", state)
+		}
+	}
+}
+
+func (s *ActorSystemTestSuite) TestStopAll_WithRegisteredButNeverStartedActor_ShouldReturnNotRunningPromptly() {
+	// Arrange
+	a, err := actor.New(actor.WithProvider[*testEntity](&testEntityProvider{entity: newTestEntity("v")}))
+	s.Require().NoError(err)
+	ref, err := actorref.New(a)
+	s.Require().NoError(err)
+	sys := New()
+	s.Require().NoError(Register(sys, "unstarted", ref))
+
+	// Act
+	start := time.Now()
+	err = sys.StopAll(time.Second)
+
+	// Assert
+	s.Less(time.Since(start), 500*time.Millisecond, "StopAll waited for Done of an actor that never started")
+	s.ErrorIs(err, actor.ErrActorNotRunning)
+	s.NotErrorIs(err, actor.ErrActorGracefulStopTimeout)
+}

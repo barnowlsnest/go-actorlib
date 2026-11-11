@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/barnowlsnest/go-actorlib/v5/internal/stopwait"
 	"github.com/barnowlsnest/go-actorlib/v5/pkg/actor"
 )
 
@@ -313,7 +314,7 @@ func (s *Supervisor) restartAll(ctx context.Context) {
 		ref := c.ref
 		s.mu.Unlock()
 		if ref != nil {
-			if err := ref.Stop(s.stopTimeout); err != nil {
+			if err := stopChild(ref, s.stopTimeout); err != nil {
 				s.notifyRestartError(c.name, err)
 			}
 		}
@@ -346,7 +347,7 @@ func (s *Supervisor) StopAll(timeout time.Duration) error {
 		ref := c.ref
 		s.mu.Unlock()
 		if ref != nil {
-			if err := ref.Stop(timeout); err != nil {
+			if err := stopChild(ref, timeout); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -382,4 +383,23 @@ func (s *Supervisor) ChildState(name string) (uint64, error) {
 		return actor.Initialized, nil
 	}
 	return c.ref.State(), nil
+}
+
+// stopChild stops ref and returns once it has exited.
+//
+// actor.ErrActorNotRunning covers both terminated children and children that
+// another caller is still stopping (state Stopping), so it is treated as success
+// only after ref.Done() closes — otherwise a restart could run a replacement
+// alongside the old instance. A never-started child (Initialized) has no
+// goroutine to wait for, so its error is returned immediately.
+func stopChild(ref ChildRef, timeout time.Duration) error {
+	err := ref.Stop(timeout)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, actor.ErrActorNotRunning) || ref.State() == actor.Initialized {
+		return err
+	}
+
+	return stopwait.Wait(ref.Done(), timeout, err)
 }
